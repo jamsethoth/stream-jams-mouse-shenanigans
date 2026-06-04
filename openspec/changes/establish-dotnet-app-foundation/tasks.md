@@ -24,6 +24,7 @@
 - [ ] 4.1 Add `tests/MouseShenanigans.Core.Tests` with the selected .NET test framework and central package versions.
 - [ ] 4.2 Add tests for representative directional delta decomposition: horizontal movement, vertical movement, diagonal movement, and zero movement.
 - [ ] 4.3 Ensure tests run without requiring a Windows desktop session, mouse hooks, input injection, or target-window state.
+- [ ] 4.4 Do not add automated desktop UI/input tests, WinAppDriver/Appium/FlaUI tests, or a self-hosted interactive Windows runner in this foundation change.
 
 ## 5. CI And Security Validation
 
@@ -36,9 +37,10 @@
 ## 6. Documentation And Verification
 
 - [ ] 6.1 Update README local tooling instructions with the required .NET SDK line and restore/format/build/test commands.
-- [ ] 6.2 Run `dotnet restore` for the solution where the .NET SDK is available.
-- [ ] 6.3 Run `dotnet format --verify-no-changes` or the agreed equivalent formatting validation.
-- [ ] 6.4 Run `dotnet build --no-restore` for the solution.
-- [ ] 6.5 Run `dotnet test --no-build` for the solution.
-- [ ] 6.6 On Windows, manually launch the tray shell and verify it starts and exits cleanly without installing mouse hooks, injecting input, exposing control endpoints, or requiring a target application.
-- [ ] 6.7 Record any environment limitation if local verification cannot be completed in the current WSL workspace.
+- [ ] 6.2 Document that actual tray behavior, global hotkeys, low-level mouse hooks, input injection, target-window gating, and Streamer.bot interaction remain manual verification items for now.
+- [ ] 6.3 Run `dotnet restore` for the solution where the .NET SDK is available.
+- [ ] 6.4 Run `dotnet format --verify-no-changes` or the agreed equivalent formatting validation.
+- [ ] 6.5 Run `dotnet build --no-restore` for the solution.
+- [ ] 6.6 Run `dotnet test --no-build` for the solution.
+- [ ] 6.7 On Windows, manually launch the tray shell and verify it starts and exits cleanly without installing mouse hooks, injecting input, exposing control endpoints, or requiring a target application.
+- [ ] 6.8 Record any environment limitation if local verification cannot be completed in the current WSL workspace.

@@ -41,6 +41,17 @@ The repository SHALL include automated tests for the pure core behavior introduc
 - **WHEN** the app foundation introduces initial directional mouse logic
 - **THEN** tests cover representative directional delta decomposition behavior for horizontal, vertical, and zero movement
 
+### Requirement: Manual desktop behavior boundary
+The app foundation SHALL keep real Windows desktop-session behavior checks manual for now instead of introducing an automated desktop UI or input harness.
+
+#### Scenario: Desktop automation harness is not introduced
+- **WHEN** the app foundation is implemented
+- **THEN** it does not add automated tests for tray UI behavior, global hotkeys, low-level mouse hooks, input injection, target-window gating, or Streamer.bot desktop interaction
+
+#### Scenario: Manual checks are documented
+- **WHEN** a developer reads the repository documentation or implementation checklist
+- **THEN** it identifies desktop-session behavior that must be verified manually until a later change introduces a dedicated automation strategy
+
 ### Requirement: CI validation
 The repository SHALL validate the .NET app foundation in GitHub Actions.
 

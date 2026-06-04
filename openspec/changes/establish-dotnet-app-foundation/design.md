@@ -14,6 +14,7 @@ This change establishes the implementation foundation only. It should create a m
 - Add repository-level C# build conventions: nullable reference types, implicit usings, analyzers, warnings-as-errors, central package management, and deterministic builds.
 - Update CI so GitHub pull requests run .NET restore, formatting/analyzer validation, build, tests, dependency review, and one CodeQL security analysis path.
 - Keep check names aligned with repository branch protection where practical: `validate`, `build`, `dependency-review`, and one CodeQL requirement.
+- Document that real desktop-session behavior checks remain manual for now to avoid adding a premature Windows UI/input automation harness.
 
 **Non-Goals:**
 
@@ -21,6 +22,7 @@ This change establishes the implementation foundation only. It should create a m
 - Implement named profile persistence or runtime profile switching.
 - Implement the tray menu beyond the minimum shell required for a compiling Windows app.
 - Implement REST, WebSocket, named-pipe, or CLI automation endpoints.
+- Add automated desktop UI tests, global input tests, WinAppDriver/Appium/FlaUI tests, or a self-hosted interactive Windows runner.
 - Add installer, signing, auto-update, or release packaging.
 - Add driver-level or elevated-input approaches.
 
@@ -92,12 +94,23 @@ The first workflow should include:
 
 The implementation should verify final GitHub check names after the first workflow run because CodeQL check naming can differ from job naming.
 
+### Keep desktop behavior verification manual for now
+
+Do not build a desktop automation harness in this foundation change. Automated tests should cover pure core logic and non-desktop state transitions only. Real tray behavior, global hotkeys, low-level mouse hooks, input injection, target-window gating, and Streamer.bot interaction should remain documented manual checks until the runtime behavior exists and has stabilized.
+
+Alternatives considered:
+
+- Dedicated Windows desktop integration harness with a controlled target window and synthetic input: valuable later, but too much complexity before the runtime hook/injection implementation exists.
+- UI Automation, WinAppDriver/Appium, or FlaUI: useful for conventional UI workflows, but they do not directly answer the highest-risk question of whether low-level hook/injection behavior works in the user desktop session.
+- Self-hosted interactive Windows runner: possible later, but operationally heavier than the current foundation requires.
+
 ## Risks / Trade-offs
 
 - SDK availability risk -> Add `global.json` and document local tooling; CI installs the required SDK explicitly.
 - Windows-only build constraints -> Run CI on Windows and avoid pretending Linux validates WinForms/P/Invoke behavior.
 - Analyzer strictness can slow initial scaffold -> Keep warnings-as-errors, but avoid adding broad third-party analyzers until the first code shape settles.
 - CodeQL check-name mismatch -> Verify check names after the first CI run and adjust branch protection or workflow names as a follow-up if needed.
+- Manual desktop verification can miss regressions -> Keep the manual checklist short, explicit, and tied to behavior that cannot be validated meaningfully in ordinary CI yet.
 - Foundation scope creep -> Keep this change to shell, project layout, CI, and baseline tests; defer runtime mouse and automation features to dedicated changes.
 
 ## Migration Plan
@@ -106,7 +119,7 @@ The implementation should verify final GitHub check names after the first workfl
 2. Add the minimal Core behavior and tests needed to make the baseline meaningful.
 3. Add the minimal WinForms tray shell that compiles but does not implement runtime mouse behavior.
 4. Add or update CI workflows for validate, build/test, dependency review, and CodeQL.
-5. Update README with local .NET commands if implementation changes developer workflow.
+5. Update README with local .NET commands and the manual desktop-verification boundary.
 6. Run local validation where tooling is available and verify CI after pushing.
 
 Rollback is straightforward while no runtime behavior exists: revert the scaffold and workflow changes.
