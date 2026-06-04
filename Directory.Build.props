@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="&apos;$(CI)&apos; == &apos;true&apos;">true</ContinuousIntegrationBuild>
+    <EnableWindowsTargeting Condition="&apos;$(OS)&apos; != &apos;Windows_NT&apos;">true</EnableWindowsTargeting>
+  </PropertyGroup>
+</Project>
