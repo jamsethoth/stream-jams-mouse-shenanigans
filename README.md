@@ -41,9 +41,9 @@ Each direction can then be mapped to a new output vector. A configuration might 
 
 This keeps the initial idea simple while leaving room for presets such as horizontal inversion, directional scaling, axis swapping, or one-direction-only effects.
 
-## Initial Implementation Direction
+## Proposed App And Feature Set
 
-The likely first implementation is a small C#/.NET Windows tray app that:
+The proposed app is a small C#/.NET Windows tray utility that:
 
 - Runs in the background.
 - Provides a global toggle hotkey.
@@ -57,6 +57,8 @@ The likely first implementation is a small C#/.NET Windows tray app that:
 - Ignores its own injected movement to avoid feedback loops.
 - Shows basic tray icon status for enabled and disabled states.
 - Exposes a local control surface that external tools can call to toggle behavior, switch profiles, or apply selected config changes.
+
+The project is intentionally scoped as a user-session desktop utility, not a service or driver. It should be easy to start, stop, disable in an emergency, and inspect while a stream is live.
 
 ## Profiles And External Control
 
@@ -85,6 +87,18 @@ The minimum useful version should support:
 - Basic tray icon status.
 - A minimal local control endpoint or command mechanism for external automation.
 
+## Current Foundation
+
+The repository now contains the first .NET app foundation rather than only project notes. The current scaffold includes:
+
+- `MouseShenanigans.Core`, a pure C# library for app logic that can be tested without Windows desktop APIs.
+- `MouseShenanigans.Windows`, a Windows-specific adapter project for future Win32 integration boundaries.
+- `MouseShenanigans.Tray`, a minimal WinForms tray executable with an exit menu and no runtime mouse interception behavior yet.
+- `MouseShenanigans.Core.Tests`, an xUnit test project covering directional delta decomposition.
+- GitHub Actions validation for restore, formatting, analyzers, build, tests, dependency review, and one CodeQL C# analysis path.
+
+Runtime features such as low-level mouse hooks, hotkeys, target-window detection, input injection, persisted profiles, profile switching UI, and Streamer.bot control endpoints are planned features. They are deliberately not implemented in the foundation change so the project layout, build policy, and test boundary can settle first.
+
 ## Constraints And Risks
 
 The first version should avoid driver-level implementation and use standard Windows APIs such as:
@@ -105,6 +119,51 @@ Some applications may not behave well with this approach, especially:
 
 If standard Win32 input interception is not reliable for the target application, a more advanced driver-level approach may be needed later. That is deliberately out of scope for the first pass.
 
+## Tech Stack Decisions
+
+The selected foundation is .NET 10 with C#. This is the current LTS line for new .NET work and gives the project strong Windows desktop support, straightforward Win32 interop options, nullable reference types, analyzers, and a mature test ecosystem.
+
+Windows-specific projects target `net10.0-windows`. The tray host uses WinForms because `NotifyIcon` and the WinForms message loop are a direct fit for a notification-area utility. WPF or WinUI may become useful for a richer settings UI later, but they add complexity before the app needs it.
+
+The solution is split into small projects so core behavior can stay portable and testable:
+
+- Core logic belongs in `MouseShenanigans.Core`.
+- Win32 and desktop integration boundaries belong in `MouseShenanigans.Windows`.
+- The tray executable and composition root belong in `MouseShenanigans.Tray`.
+- Fast non-desktop unit tests belong in `MouseShenanigans.Core.Tests`.
+
+The foundation also uses repository-level .NET configuration:
+
+- `global.json` selects the intended .NET SDK line.
+- `Directory.Build.props` centralizes compiler, analyzer, warnings-as-errors, deterministic build, and Windows targeting settings.
+- `Directory.Packages.props` centralizes NuGet package versions.
+- `.editorconfig` captures formatting and analyzer preferences used by `dotnet format`.
+
+xUnit is used for the initial unit tests because the first automated coverage is pure domain behavior. Automated desktop UI, global input, and Streamer.bot integration tests are intentionally deferred until those runtime features exist and the right test harness is clearer.
+
+## Local Tooling
+
+The app foundation targets .NET 10 and uses a Windows-oriented C# solution. Local development should use the .NET 10 SDK or the official .NET 10 SDK Docker image.
+
+Common validation commands:
+
+```bash
+dotnet restore MouseShenanigans.slnx
+dotnet format MouseShenanigans.slnx --verify-no-changes --no-restore
+dotnet build MouseShenanigans.slnx --configuration Release --no-restore
+dotnet test MouseShenanigans.slnx --configuration Release --no-build
+```
+
+The same commands can be run from WSL through the official `mcr.microsoft.com/dotnet/sdk:10.0` Docker image when the .NET SDK is not installed directly in WSL.
+
+When validating from WSL or another non-Windows environment, Windows-targeted project compilation relies on `EnableWindowsTargeting=true` from the shared build configuration. This validates compilation, analyzers, and non-desktop tests only.
+
+## Manual Verification Boundary
+
+From WSL or Docker, stop at restore, format, build, and non-desktop tests. The Windows tray launch check must be performed manually in a real Windows desktop session.
+
+Actual desktop-session behavior remains manual for now. This includes tray behavior, global hotkeys, low-level mouse hooks, input injection, target-window gating, and Streamer.bot interaction. Automated coverage should stay focused on pure core logic, build validation, formatting, analyzers, and non-desktop tests until the runtime behavior exists and is stable.
+
 ## Current Status
 
-This repository is at the project-intent stage. The next refinements should define the first target application, the default hotkeys, the initial profile/config schema, the preferred local control protocol for Streamer.bot integration, and the smallest proof of concept that can validate whether normal Win32 mouse interception is enough.
+This repository has an initial .NET/C# app foundation with CI and baseline tests. The next refinements should define the first target application, the default hotkeys, the initial profile/config schema, the preferred local control protocol for Streamer.bot integration, and the smallest proof of concept that can validate whether normal Win32 mouse interception is enough.

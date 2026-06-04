@@ -3,6 +3,14 @@ dist/
 coverage/
 .vite/
 .turbo/
+.vs/
+.idea/
+.vscode/
+bin/
+obj/
+TestResults/
+.nuget/
+*.user
 .DS_Store
 *.log
 .env
@@ -10,4 +18,3 @@ coverage/
 !.env.example
 test-results/
 playwright-report/
-

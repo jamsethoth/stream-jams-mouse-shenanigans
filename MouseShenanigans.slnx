@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MouseShenanigans.Core/MouseShenanigans.Core.csproj" />
+    <Project Path="src/MouseShenanigans.Tray/MouseShenanigans.Tray.csproj" />
+    <Project Path="src/MouseShenanigans.Windows/MouseShenanigans.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MouseShenanigans.Core.Tests/MouseShenanigans.Core.Tests.csproj" />
+  </Folder>
+</Solution>
