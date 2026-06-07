@@ -3,7 +3,7 @@ schema: spec-driven
 context: |
   Project: Stream Jams Mouse Shenanigans.
   Purpose: Windows-only C#/.NET tray utility for toggling custom mouse movement remapping against a specific third-party application window.
-  Current stage: project-intent and proof-of-concept planning; no application code has been scaffolded yet.
+  Current stage: .NET app foundation is scaffolded; pure-core remapping profiles and tests are implemented, while Windows runtime mouse hooks, target-window gating, hotkeys, tray profile controls, profile file persistence, and local automation endpoints remain planned.
   Initial target behavior: horizontal inversion.
   Broader behavior: named, persisted directional remapping profiles that can be switched at runtime.
   Streaming integration goal: expose a local control surface that Streamer.bot or another automation tool can invoke to enable, disable, toggle, switch profiles, reload profiles, or apply selected config changes.
@@ -18,3 +18,6 @@ rules:
   tasks:
     - Separate proof-of-concept validation from production hardening tasks.
     - Include manual Windows verification steps for mouse interception, target-window detection, and injected-movement feedback loops.
+  specs:
+    - Use Given/When/Then format
+    - Reference existing patterns before inventing new ones

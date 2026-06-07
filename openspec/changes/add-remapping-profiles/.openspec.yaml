@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-06-07
+goal: Make the README directional remapping model executable and testable in
+  MouseShenanigans.Core.
