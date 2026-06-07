@@ -42,5 +42,5 @@
 - [x] 6.4 Run `dotnet format --verify-no-changes` or the agreed equivalent formatting validation.
 - [x] 6.5 Run `dotnet build --no-restore` for the solution.
 - [x] 6.6 Run `dotnet test --no-build` for the solution.
-- [ ] 6.7 On Windows, manually launch the tray shell and verify it starts and exits cleanly without installing mouse hooks, injecting input, exposing control endpoints, or requiring a target application.
+- [x] 6.7 On Windows, manually launch the tray shell and verify it starts and exits cleanly without installing mouse hooks, injecting input, exposing control endpoints, or requiring a target application.
 - [x] 6.8 Record any environment limitation if local verification cannot be completed in the current WSL workspace.

@@ -91,13 +91,13 @@ The minimum useful version should support:
 
 The repository now contains the first .NET app foundation rather than only project notes. The current scaffold includes:
 
-- `MouseShenanigans.Core`, a pure C# library for app logic that can be tested without Windows desktop APIs.
+- `MouseShenanigans.Core`, a pure C# library for app logic that can be tested without Windows desktop APIs, including directional movement decomposition and pure remapping profile behavior.
 - `MouseShenanigans.Windows`, a Windows-specific adapter project for future Win32 integration boundaries.
 - `MouseShenanigans.Tray`, a minimal WinForms tray executable with an exit menu and no runtime mouse interception behavior yet.
-- `MouseShenanigans.Core.Tests`, an xUnit test project covering directional delta decomposition.
+- `MouseShenanigans.Core.Tests`, an xUnit test project covering directional delta decomposition and pure remapping profile behavior.
 - GitHub Actions validation for restore, formatting, analyzers, build, tests, dependency review, and one CodeQL C# analysis path.
 
-Runtime features such as low-level mouse hooks, hotkeys, target-window detection, input injection, persisted profiles, profile switching UI, and Streamer.bot control endpoints are planned features. They are deliberately not implemented in the foundation change so the project layout, build policy, and test boundary can settle first.
+Runtime features such as low-level mouse hooks, hotkeys, target-window detection, input injection, profile file persistence, profile switching UI, and Streamer.bot control endpoints are planned features. They are deliberately not implemented in the current core remapping work so the profile model, transformation math, and test boundary can settle first.
 
 ## Constraints And Risks
 
@@ -166,4 +166,4 @@ Actual desktop-session behavior remains manual for now. This includes tray behav
 
 ## Current Status
 
-This repository has an initial .NET/C# app foundation with CI and baseline tests. The next refinements should define the first target application, the default hotkeys, the initial profile/config schema, the preferred local control protocol for Streamer.bot integration, and the smallest proof of concept that can validate whether normal Win32 mouse interception is enough.
+This repository has an initial .NET/C# app foundation with CI and baseline tests. The current core slice defines named directional remapping profiles, a horizontal inversion preset, JSON profile document parsing, and pure remapping behavior. The next refinements should define the first target application, the default hotkeys, the preferred local control protocol for Streamer.bot integration, and the smallest proof of concept that can validate whether normal Win32 mouse interception is enough.
