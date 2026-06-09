@@ -5,35 +5,84 @@ namespace MouseShenanigans.Windows.Tests;
 public sealed class RuntimeTargetSelectorTests
 {
     [Fact]
-    public void IsMatchMatchesProcessNameIgnoringCaseForForegroundWindow()
+    public void EvaluateReturnsInsideBoundsForForegroundProcessMatchWithCursorInsideBounds()
     {
         RuntimeTargetSelector selector = RuntimeTargetSelector.ForProcessName("TargetApp");
         var snapshot = new TargetWindowSnapshot(
-            foregroundWindow: new TargetWindowInfo(processName: "targetapp", title: "Target App"),
-            windowUnderCursor: null);
+            foregroundWindow: new TargetWindowInfo(
+                processName: "targetapp",
+                title: "Target App",
+                bounds: new ScreenRectangle(left: 10, top: 10, right: 110, bottom: 110)),
+            windowUnderCursor: null,
+            cursorPosition: new ScreenPoint(50, 50));
 
-        Assert.True(selector.IsMatch(snapshot));
+        RuntimeTargetEligibility eligibility = selector.Evaluate(snapshot);
+
+        Assert.Equal(RuntimeTargetEligibilityState.InsideBounds, eligibility.State);
+        Assert.True(eligibility.IsEligibleForRemapping);
     }
 
     [Fact]
-    public void IsMatchMatchesWindowTitleIgnoringCaseForWindowUnderCursor()
+    public void EvaluateReturnsInsideBoundsForWindowTitleMatchUnderCursor()
     {
         RuntimeTargetSelector selector = RuntimeTargetSelector.ForWindowTitleContains("target canvas");
         var snapshot = new TargetWindowSnapshot(
             foregroundWindow: null,
-            windowUnderCursor: new TargetWindowInfo(processName: "Example", title: "Streaming Target Canvas"));
+            windowUnderCursor: new TargetWindowInfo(
+                processName: "Example",
+                title: "Streaming Target Canvas",
+                bounds: new ScreenRectangle(left: 10, top: 10, right: 110, bottom: 110)),
+            cursorPosition: new ScreenPoint(50, 50));
 
-        Assert.True(selector.IsMatch(snapshot));
+        RuntimeTargetEligibility eligibility = selector.Evaluate(snapshot);
+
+        Assert.Equal(RuntimeTargetEligibilityState.InsideBounds, eligibility.State);
     }
 
     [Fact]
-    public void IsMatchReturnsFalseWhenNeitherForegroundNorUnderCursorWindowMatches()
+    public void EvaluateReturnsOutsideBoundsForForegroundMatchWithCursorOutsideBounds()
+    {
+        RuntimeTargetSelector selector = RuntimeTargetSelector.ForProcessName("TargetApp");
+        var snapshot = new TargetWindowSnapshot(
+            foregroundWindow: new TargetWindowInfo(
+                processName: "TargetApp",
+                title: "Target App",
+                bounds: new ScreenRectangle(left: 10, top: 10, right: 110, bottom: 110)),
+            windowUnderCursor: null,
+            cursorPosition: new ScreenPoint(200, 50));
+
+        RuntimeTargetEligibility eligibility = selector.Evaluate(snapshot);
+
+        Assert.Equal(RuntimeTargetEligibilityState.OutsideBounds, eligibility.State);
+        Assert.False(eligibility.IsEligibleForRemapping);
+    }
+
+    [Fact]
+    public void EvaluateReturnsBoundsUnavailableForMatchWithoutReadableBounds()
+    {
+        RuntimeTargetSelector selector = RuntimeTargetSelector.ForProcessName("TargetApp");
+        var snapshot = new TargetWindowSnapshot(
+            foregroundWindow: new TargetWindowInfo(processName: "TargetApp", title: "Target App"),
+            windowUnderCursor: null,
+            cursorPosition: new ScreenPoint(50, 50));
+
+        RuntimeTargetEligibility eligibility = selector.Evaluate(snapshot);
+
+        Assert.Equal(RuntimeTargetEligibilityState.BoundsUnavailable, eligibility.State);
+        Assert.False(eligibility.IsEligibleForRemapping);
+    }
+
+    [Fact]
+    public void EvaluateReturnsNoMatchWhenNeitherForegroundNorUnderCursorWindowMatches()
     {
         RuntimeTargetSelector selector = RuntimeTargetSelector.ForProcessName("TargetApp");
         var snapshot = new TargetWindowSnapshot(
             foregroundWindow: new TargetWindowInfo(processName: "OtherApp", title: "Target App"),
-            windowUnderCursor: new TargetWindowInfo(processName: "Example", title: "Target Canvas"));
+            windowUnderCursor: new TargetWindowInfo(processName: "Example", title: "Target Canvas"),
+            cursorPosition: new ScreenPoint(50, 50));
 
-        Assert.False(selector.IsMatch(snapshot));
+        RuntimeTargetEligibility eligibility = selector.Evaluate(snapshot);
+
+        Assert.Equal(RuntimeTargetEligibilityState.NoMatch, eligibility.State);
     }
 }

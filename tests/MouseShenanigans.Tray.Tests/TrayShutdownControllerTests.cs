@@ -46,9 +46,16 @@ public sealed class TrayShutdownControllerTests
     {
         public RuntimeRemappingStatus Status { get; } = RuntimeRemappingStatus.Disabled;
 
+        public bool IsCursorLockEnabled { get; private set; }
+
         public int DisposeRequests { get; private set; }
 
         public bool IsDisposed => DisposeRequests > 0;
+
+        public void SetCursorLockEnabled(bool enabled)
+        {
+            IsCursorLockEnabled = enabled;
+        }
 
         public void Enable()
         {
