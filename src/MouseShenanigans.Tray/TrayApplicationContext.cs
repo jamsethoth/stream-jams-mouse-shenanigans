@@ -4,44 +4,126 @@ namespace MouseShenanigans.Tray;
 
 internal sealed class TrayApplicationContext : ApplicationContext
 {
+    private readonly AbsoluteCursorRemappingCoordinator runtime;
+    private readonly ToolStripMenuItem statusItem;
+    private readonly ToolStripMenuItem enableItem;
+    private readonly ToolStripMenuItem disableItem;
+    private readonly TrayShutdownController shutdownController;
     private readonly NotifyIcon notifyIcon;
+    private bool disposed;
 
     public TrayApplicationContext()
     {
+        runtime = CreateRuntime();
+        statusItem = new ToolStripMenuItem { Enabled = false };
+        enableItem = new ToolStripMenuItem("Enable remapping");
+        disableItem = new ToolStripMenuItem("Disable remapping");
+
+        enableItem.Click += (_, _) =>
+        {
+            runtime.Enable();
+            UpdateRuntimeStatus();
+        };
+        disableItem.Click += (_, _) =>
+        {
+            runtime.Disable();
+            UpdateRuntimeStatus();
+        };
+        shutdownController = new TrayShutdownController(runtime, HideNotifyIcon, ExitThread);
+
         notifyIcon = new NotifyIcon
         {
             ContextMenuStrip = CreateContextMenu(),
             Icon = SystemIcons.Application,
-            Text = CreateTrayText(),
             Visible = true,
         };
+
+        UpdateRuntimeStatus();
     }
 
     protected override void Dispose(bool disposing)
     {
+        if (disposed)
+        {
+            return;
+        }
+
         if (disposing)
         {
+            runtime.Dispose();
+            HideNotifyIcon();
             notifyIcon.Dispose();
         }
 
+        disposed = true;
         base.Dispose(disposing);
     }
 
-    private static ContextMenuStrip CreateContextMenu()
+    private ContextMenuStrip CreateContextMenu()
     {
         var exitItem = new ToolStripMenuItem("Exit");
-        exitItem.Click += (_, _) => Application.Exit();
+        exitItem.Click += (_, _) => shutdownController.RequestExit();
 
         return new ContextMenuStrip
         {
-            Items = { exitItem },
+            Items =
+            {
+                statusItem,
+                new ToolStripSeparator(),
+                enableItem,
+                disableItem,
+                new ToolStripSeparator(),
+                exitItem,
+            },
         };
     }
 
-    private static string CreateTrayText()
+    private void UpdateRuntimeStatus()
     {
-        return WindowsRuntime.IsDesktopInputAvailable
-            ? "Mouse Shenanigans"
-            : "Mouse Shenanigans (unsupported platform)";
+        RuntimeRemappingStatus status = runtime.Status;
+        notifyIcon.Text = CreateTrayText(status);
+        statusItem.Text = CreateStatusText(status);
+        enableItem.Enabled = status.State is RuntimeRemappingState.Disabled or RuntimeRemappingState.Failed;
+        disableItem.Enabled = status.State == RuntimeRemappingState.Enabled;
+    }
+
+    private void HideNotifyIcon()
+    {
+        notifyIcon.Visible = false;
+    }
+
+    private static AbsoluteCursorRemappingCoordinator CreateRuntime()
+    {
+        return new AbsoluteCursorRemappingCoordinator(
+            RuntimeProofOfConceptDefaults.CreateOptions(),
+            new RawInputMouseMovementSource(),
+            new TargetWindowReader(),
+            new WindowsCursorPositionController());
+    }
+
+    private static string CreateTrayText(RuntimeRemappingStatus status)
+    {
+        return status.State switch
+        {
+            RuntimeRemappingState.Enabled => "Mouse Shenanigans - enabled",
+            RuntimeRemappingState.Unsupported => "Mouse Shenanigans - unsupported",
+            RuntimeRemappingState.Failed => "Mouse Shenanigans - failed",
+            _ => "Mouse Shenanigans - disabled",
+        };
+    }
+
+    private static string CreateStatusText(RuntimeRemappingStatus status)
+    {
+        string stateText = status.State switch
+        {
+            RuntimeRemappingState.Enabled => $"Enabled for {RuntimeProofOfConceptDefaults.TargetProcessName}",
+            RuntimeRemappingState.Unsupported => "Unsupported desktop session",
+            RuntimeRemappingState.Failed => "Runtime failed",
+            _ => $"Disabled for {RuntimeProofOfConceptDefaults.TargetProcessName}",
+        };
+
+        return string.IsNullOrWhiteSpace(status.Message)
+            ? stateText
+            : $"{stateText}: {status.Message}";
     }
 }
