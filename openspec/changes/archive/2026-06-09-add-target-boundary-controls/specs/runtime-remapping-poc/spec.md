@@ -71,6 +71,8 @@ The system SHALL apply runtime remapping only when one configured third-party ta
 - **GIVEN** the runtime is enabled
 - **AND** remapping is paused because the cursor is outside a matching foreground target bounds
 - **WHEN** ordinary movement returns the cursor inside the target window bounds
+- **THEN** remapping remains paused for a short target re-entry grace period
+- **AND** if the cursor remains inside the target window bounds until the grace period expires
 - **THEN** later matching movement is eligible for remapping again
 
 #### Scenario: Target bounds are unavailable

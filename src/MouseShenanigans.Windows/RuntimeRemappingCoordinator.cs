@@ -7,8 +7,10 @@ public sealed class RuntimeRemappingCoordinator : IRuntimeRemappingController
     private readonly ITargetWindowReader targetWindowReader;
     private readonly IMouseMovementInjector injector;
     private readonly RuntimeRemappingDecisionEngine decisionEngine;
+    private readonly RuntimeTargetReentryGate targetReentryGate;
     private readonly bool isSupported;
     private bool disposed;
+    private bool isCursorLockEnabled;
 
     public RuntimeRemappingCoordinator(
         RuntimeRemappingOptions options,
@@ -20,6 +22,7 @@ public sealed class RuntimeRemappingCoordinator : IRuntimeRemappingController
             hook,
             targetWindowReader,
             injector,
+            SystemRuntimeClock.Instance,
             WindowsRuntime.IsDesktopInputAvailable)
     {
     }
@@ -30,13 +33,32 @@ public sealed class RuntimeRemappingCoordinator : IRuntimeRemappingController
         ITargetWindowReader targetWindowReader,
         IMouseMovementInjector injector,
         bool isSupported)
+        : this(
+            options,
+            hook,
+            targetWindowReader,
+            injector,
+            SystemRuntimeClock.Instance,
+            isSupported)
+    {
+    }
+
+    public RuntimeRemappingCoordinator(
+        RuntimeRemappingOptions options,
+        IMouseMovementHook hook,
+        ITargetWindowReader targetWindowReader,
+        IMouseMovementInjector injector,
+        IRuntimeClock clock,
+        bool isSupported)
     {
         this.options = options ?? throw new ArgumentNullException(nameof(options));
         this.hook = hook ?? throw new ArgumentNullException(nameof(hook));
         this.targetWindowReader = targetWindowReader ?? throw new ArgumentNullException(nameof(targetWindowReader));
         this.injector = injector ?? throw new ArgumentNullException(nameof(injector));
         this.isSupported = isSupported;
+        isCursorLockEnabled = options.CursorLockEnabled;
         decisionEngine = new RuntimeRemappingDecisionEngine(options.ActiveProfile);
+        targetReentryGate = new RuntimeTargetReentryGate(options.TargetReentryGracePeriod, clock);
 
         Status = isSupported
             ? RuntimeRemappingStatus.Disabled
@@ -44,6 +66,15 @@ public sealed class RuntimeRemappingCoordinator : IRuntimeRemappingController
     }
 
     public RuntimeRemappingStatus Status { get; private set; }
+
+    public bool IsCursorLockEnabled => isCursorLockEnabled;
+
+    public void SetCursorLockEnabled(bool enabled)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+
+        isCursorLockEnabled = enabled;
+    }
 
     public void Enable()
     {
@@ -62,12 +93,14 @@ public sealed class RuntimeRemappingCoordinator : IRuntimeRemappingController
 
         try
         {
+            targetReentryGate.Reset();
             hook.Start(HandleMovement);
             Status = RuntimeRemappingStatus.Enabled;
         }
         catch (Exception ex)
         {
             TryStopHook();
+            targetReentryGate.Reset();
             Status = RuntimeRemappingStatus.Failed(ex.Message);
         }
     }
@@ -88,6 +121,7 @@ public sealed class RuntimeRemappingCoordinator : IRuntimeRemappingController
         if (TryStopHook())
         {
             decisionEngine.ResetAccumulator();
+            targetReentryGate.Reset();
             Status = RuntimeRemappingStatus.Disabled;
         }
     }
@@ -100,6 +134,7 @@ public sealed class RuntimeRemappingCoordinator : IRuntimeRemappingController
         }
 
         TryStopHook();
+        targetReentryGate.Reset();
         hook.Dispose();
         disposed = true;
     }
@@ -114,11 +149,12 @@ public sealed class RuntimeRemappingCoordinator : IRuntimeRemappingController
         try
         {
             TargetWindowSnapshot targetSnapshot = targetWindowReader.ReadSnapshot();
-            bool targetMatches = options.TargetSelector.IsMatch(targetSnapshot);
+            RuntimeTargetEligibility eligibility = options.TargetSelector.Evaluate(targetSnapshot);
+            RuntimeTargetReadiness readiness = targetReentryGate.Evaluate(eligibility);
             RuntimeRemappingDecision decision = decisionEngine.Decide(
                 movement,
                 isEnabled: true,
-                targetMatches);
+                readiness.IsEligibleForRemapping);
 
             if (decision.InjectedMovement is { } replacement)
             {
@@ -130,6 +166,7 @@ public sealed class RuntimeRemappingCoordinator : IRuntimeRemappingController
         catch (Exception ex)
         {
             TryStopHook();
+            targetReentryGate.Reset();
             Status = RuntimeRemappingStatus.Failed(ex.Message);
             return false;
         }

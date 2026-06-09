@@ -16,6 +16,28 @@ public sealed class RuntimeRemappingOptionsTests
         Assert.Equal(0.75, options.AbsoluteCorrectionScale);
     }
 
+
+    [Fact]
+    public void ConstructorDisablesCursorLockByDefault()
+    {
+        var options = new RuntimeRemappingOptions(
+            RuntimeTargetSelector.ForProcessName("TargetApp"),
+            BuiltInRemappingProfiles.HorizontalInversion);
+
+        Assert.False(options.CursorLockEnabled);
+    }
+
+    [Fact]
+    public void ConstructorStoresCursorLockSetting()
+    {
+        var options = new RuntimeRemappingOptions(
+            RuntimeTargetSelector.ForProcessName("TargetApp"),
+            BuiltInRemappingProfiles.HorizontalInversion,
+            cursorLockEnabled: true);
+
+        Assert.True(options.CursorLockEnabled);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-0.1)]

@@ -39,14 +39,64 @@ public sealed class RuntimeTargetSelector
         return new RuntimeTargetSelector(processName: null, windowTitleContains);
     }
 
+    public RuntimeTargetEligibility Evaluate(TargetWindowSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        RuntimeTargetEligibility? fallback = null;
+
+        foreach (TargetWindowInfo window in MatchingWindows(snapshot))
+        {
+            RuntimeTargetEligibility eligibility = EvaluateMatchedWindow(window, snapshot.CursorPosition);
+            if (eligibility.State == RuntimeTargetEligibilityState.InsideBounds)
+            {
+                return eligibility;
+            }
+
+            fallback ??= eligibility;
+        }
+
+        return fallback ?? RuntimeTargetEligibility.NoMatch;
+    }
+
     public bool IsMatch(TargetWindowSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
-        return IsMatch(snapshot.ForegroundWindow) || IsMatch(snapshot.WindowUnderCursor);
+        return IsIdentityMatch(snapshot.ForegroundWindow) || IsIdentityMatch(snapshot.WindowUnderCursor);
     }
 
-    private bool IsMatch(TargetWindowInfo? window)
+    private IEnumerable<TargetWindowInfo> MatchingWindows(TargetWindowSnapshot snapshot)
+    {
+        if (snapshot.ForegroundWindow is { } foregroundWindow
+            && IsIdentityMatch(foregroundWindow))
+        {
+            yield return foregroundWindow;
+        }
+
+        if (snapshot.WindowUnderCursor is { } windowUnderCursor
+            && !ReferenceEquals(windowUnderCursor, snapshot.ForegroundWindow)
+            && IsIdentityMatch(windowUnderCursor))
+        {
+            yield return windowUnderCursor;
+        }
+    }
+
+    private static RuntimeTargetEligibility EvaluateMatchedWindow(
+        TargetWindowInfo window,
+        ScreenPoint? cursorPosition)
+    {
+        if (window.Bounds is not { } bounds || cursorPosition is not { } point)
+        {
+            return RuntimeTargetEligibility.BoundsUnavailable(window);
+        }
+
+        return bounds.Contains(point)
+            ? RuntimeTargetEligibility.InsideBounds(window)
+            : RuntimeTargetEligibility.OutsideBounds(window);
+    }
+
+    private bool IsIdentityMatch(TargetWindowInfo? window)
     {
         if (window is null)
         {

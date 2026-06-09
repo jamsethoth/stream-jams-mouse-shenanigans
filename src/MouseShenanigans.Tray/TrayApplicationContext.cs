@@ -8,6 +8,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly ToolStripMenuItem statusItem;
     private readonly ToolStripMenuItem enableItem;
     private readonly ToolStripMenuItem disableItem;
+    private readonly ToolStripMenuItem cursorLockItem;
+    private readonly TrayCursorLockController cursorLockController;
     private readonly TrayShutdownController shutdownController;
     private readonly NotifyIcon notifyIcon;
     private bool disposed;
@@ -18,6 +20,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
         statusItem = new ToolStripMenuItem { Enabled = false };
         enableItem = new ToolStripMenuItem("Enable remapping");
         disableItem = new ToolStripMenuItem("Disable remapping");
+        cursorLockItem = new ToolStripMenuItem("Lock cursor to target")
+        {
+            CheckOnClick = true,
+        };
+        cursorLockController = new TrayCursorLockController(runtime, UpdateRuntimeStatus);
 
         enableItem.Click += (_, _) =>
         {
@@ -29,6 +36,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             runtime.Disable();
             UpdateRuntimeStatus();
         };
+        cursorLockItem.Click += (_, _) => cursorLockController.SetCursorLockEnabled(cursorLockItem.Checked);
         shutdownController = new TrayShutdownController(runtime, HideNotifyIcon, ExitThread);
 
         notifyIcon = new NotifyIcon
@@ -72,6 +80,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 new ToolStripSeparator(),
                 enableItem,
                 disableItem,
+                cursorLockItem,
                 new ToolStripSeparator(),
                 exitItem,
             },
@@ -85,6 +94,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         statusItem.Text = CreateStatusText(status);
         enableItem.Enabled = status.State is RuntimeRemappingState.Disabled or RuntimeRemappingState.Failed;
         disableItem.Enabled = status.State == RuntimeRemappingState.Enabled;
+        cursorLockItem.Checked = runtime.IsCursorLockEnabled;
+        cursorLockItem.Enabled = status.State != RuntimeRemappingState.Unsupported;
     }
 
     private void HideNotifyIcon()
