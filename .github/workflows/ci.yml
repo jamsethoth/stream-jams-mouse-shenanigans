@@ -22,10 +22,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: validate
+  dotnet:
+    name: dotnet
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -42,35 +42,35 @@ jobs:
       - name: Verify formatting
         run: dotnet format MouseShenanigans.slnx --verify-no-changes --no-restore
 
-      - name: Build with analyzers
-        run: dotnet build MouseShenanigans.slnx --configuration Release --no-restore
-
-  build:
-    name: build
-    runs-on: windows-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          global-json-file: global.json
-
-      - name: Restore
-        run: dotnet restore MouseShenanigans.slnx
-
       - name: Build
         run: dotnet build MouseShenanigans.slnx --configuration Release --no-restore
 
       - name: Test
         run: dotnet test MouseShenanigans.slnx --configuration Release --no-build
 
+  openspec:
+    name: openspec
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install OpenSpec
+        run: npm install --global @fission-ai/openspec@1.4.1
+
+      - name: Validate specs
+        run: openspec validate --specs --strict
+
   dependency-review:
     name: dependency-review
-    if: github.event_name == pull_request
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -82,7 +82,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Review dependency changes
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5.0.0
         with:
           fail-on-severity: high
 
