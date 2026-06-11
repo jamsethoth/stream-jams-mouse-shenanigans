@@ -43,7 +43,9 @@ Dispatch should be keyed by semantic runtime command names, not by raw registrat
 
 Validate duplicate chords and unknown command bindings before registration, even while defaults are the only source. The registration lifecycle should also be able to unregister and re-register a complete binding set later so config reload can swap hotkeys without rebuilding the tray process.
 
-Recommended defaults are `Ctrl+Alt+M` for toggle and `Ctrl+Alt+Shift+M` for emergency disable unless implementation finds a conflict with standard Windows behavior during manual testing.
+Recommended defaults are `Ctrl+Alt+F8` for toggle and `Ctrl+Alt+Shift+F8` for emergency disable. Manual validation found `Ctrl+Alt+M` unavailable with Win32 error 1409 (`Hot key is already registered.`), so this slice avoids the observed conflict while keeping fixed, non-configurable defaults.
+
+Manual Windows validation later confirmed that the `Ctrl+Alt+F8` toggle hotkey, the `Ctrl+Alt+Shift+F8` emergency-disable hotkey, and the tray single-instance guard all behaved correctly in a real desktop session.
 
 ### Treat registration failure as degraded startup
 If a default hotkey cannot register, the tray app should keep running and report degraded status. Existing tray menu controls remain usable. Disposal should unregister any hotkey that did register successfully.

@@ -46,8 +46,8 @@ This keeps the initial idea simple while leaving room for presets such as horizo
 The proposed app is a small C#/.NET Windows tray utility that:
 
 - Runs in the background.
-- Provides a global toggle hotkey.
-- Provides an emergency disable hotkey.
+- Provides a global toggle hotkey (`Ctrl+Alt+F8`).
+- Provides an emergency disable hotkey (`Ctrl+Alt+Shift+F8`).
 - Persists named configuration profiles.
 - Switches between profiles while the app is running.
 - Targets a configured window by process name, window title, or selected window handle.
@@ -79,8 +79,8 @@ The first implementation does not need to commit to a public remote API. The use
 The minimum useful version should support:
 
 - One configured target window or application.
-- Toggle on/off hotkey.
-- Emergency disable hotkey.
+- Toggle on/off hotkey (`Ctrl+Alt+F8`).
+- Emergency disable hotkey (`Ctrl+Alt+Shift+F8`).
 - JSON-based directional remapping config with named profiles.
 - Runtime profile switching.
 - Horizontal inversion preset.
@@ -92,12 +92,12 @@ The minimum useful version should support:
 The repository now contains the first .NET app foundation rather than only project notes. The current scaffold includes:
 
 - `MouseShenanigans.Core`, a pure C# library for app logic that can be tested without Windows desktop APIs, including directional movement decomposition and pure remapping profile behavior.
-- `MouseShenanigans.Windows`, a Windows-specific adapter project for future Win32 integration boundaries.
-- `MouseShenanigans.Tray`, a minimal WinForms tray executable with an exit menu and no runtime mouse interception behavior yet.
+- `MouseShenanigans.Windows`, a Windows-specific adapter project for Win32 integration boundaries including runtime remapping and global hotkey registration.
+- `MouseShenanigans.Tray`, a WinForms tray executable with runtime enable/disable controls, cursor lock control, fixed global hotkeys, and tray-visible status.
 - `MouseShenanigans.Core.Tests`, an xUnit test project covering directional delta decomposition and pure remapping profile behavior.
 - GitHub Actions validation for restore, formatting, analyzers, build, tests, dependency review, and one CodeQL C# analysis path.
 
-Runtime features such as low-level mouse hooks, hotkeys, target-window detection, input injection, profile file persistence, profile switching UI, and Streamer.bot control endpoints are planned features. They are deliberately not implemented in the current core remapping work so the profile model, transformation math, and test boundary can settle first.
+Profile file persistence, profile switching UI, and Streamer.bot control endpoints remain planned features. The current implementation is still intentionally narrow so the runtime remapping, tray control flow, and Windows boundary behavior can settle before broader configuration and automation work lands.
 
 ## Constraints And Risks
 
@@ -166,4 +166,4 @@ Actual desktop-session behavior remains manual for now. This includes tray behav
 
 ## Current Status
 
-This repository has an initial .NET/C# app foundation with CI and baseline tests. The current core slice defines named directional remapping profiles, a horizontal inversion preset, JSON profile document parsing, and pure remapping behavior. The next refinements should define the first target application, the default hotkeys, the preferred local control protocol for Streamer.bot integration, and the smallest proof of concept that can validate whether normal Win32 mouse interception is enough.
+This repository now includes the initial runtime proof of concept on top of the .NET/C# app foundation. The current slices define named directional remapping profiles, a horizontal inversion preset, JSON profile document parsing, a `Streamer.bot.exe`-targeted runtime, tray enable/disable and cursor-lock controls, and fixed global hotkeys (`Ctrl+Alt+F8` and `Ctrl+Alt+Shift+F8`). The next refinements should focus on persisted profile configuration, profile switching, and the preferred local control protocol for Streamer.bot integration.
