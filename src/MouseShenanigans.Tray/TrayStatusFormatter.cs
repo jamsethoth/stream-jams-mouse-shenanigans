@@ -1,3 +1,4 @@
+using MouseShenanigans.Core;
 using MouseShenanigans.Windows;
 
 namespace MouseShenanigans.Tray;
@@ -15,19 +16,29 @@ public static class TrayStatusFormatter
         };
     }
 
-    public static string CreateRuntimeStatusText(RuntimeRemappingStatus status)
+    public static string CreateRuntimeStatusText(
+        RuntimeRemappingStatus status,
+        RuntimeConfiguration? configuration = null,
+        string? configurationStatus = null)
     {
+        string target = configuration?.TargetDisplayName ?? RuntimeProofOfConceptDefaults.TargetProcessName;
+        string profile = configuration?.ActiveProfileName ?? BuiltInRemappingProfiles.HorizontalInversion.Name;
         string stateText = status.State switch
         {
-            RuntimeRemappingState.Enabled => $"Enabled for {RuntimeProofOfConceptDefaults.TargetProcessName}",
+            RuntimeRemappingState.Enabled => $"Enabled for {target} using {profile}",
             RuntimeRemappingState.Unsupported => "Unsupported desktop session",
             RuntimeRemappingState.Failed => "Runtime failed",
-            _ => $"Disabled for {RuntimeProofOfConceptDefaults.TargetProcessName}",
+            _ => $"Disabled for {target} using {profile}",
         };
 
-        return string.IsNullOrWhiteSpace(status.Message)
+        string[] messages = new[] { status.Message, configurationStatus }
+            .Where(message => !string.IsNullOrWhiteSpace(message))
+            .Select(message => message!)
+            .ToArray();
+
+        return messages.Length == 0
             ? stateText
-            : $"{stateText}: {status.Message}";
+            : $"{stateText}: {string.Join("; ", messages)}";
     }
 
     public static string CreateHotkeyStatusText(

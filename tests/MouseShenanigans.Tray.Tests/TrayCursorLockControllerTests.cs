@@ -29,6 +29,10 @@ public sealed class TrayCursorLockControllerTests
             IsCursorLockEnabled = enabled;
         }
 
+        public void ApplyOptions(RuntimeRemappingOptions options)
+        {
+        }
+
         public void Enable()
         {
         }

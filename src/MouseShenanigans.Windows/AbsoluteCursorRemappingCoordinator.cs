@@ -2,14 +2,14 @@ namespace MouseShenanigans.Windows;
 
 public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingController
 {
-    private readonly RuntimeRemappingOptions options;
     private readonly IRawMouseMovementSource movementSource;
     private readonly ITargetWindowReader targetWindowReader;
     private readonly ICursorPositionController cursorPositionController;
     private readonly ICursorLockController cursorLockController;
-    private readonly AbsoluteCursorRemappingDecisionEngine decisionEngine;
     private readonly RuntimeTargetReentryGate targetReentryGate;
     private readonly bool isSupported;
+    private RuntimeRemappingOptions options;
+    private AbsoluteCursorRemappingDecisionEngine decisionEngine;
     private bool disposed;
     private bool isCursorLockEnabled;
     private ScreenRectangle? activeCursorLockBounds;
@@ -104,6 +104,21 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
         {
             TryReleaseCursorLock();
         }
+    }
+
+    public void ApplyOptions(RuntimeRemappingOptions options)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        ArgumentNullException.ThrowIfNull(options);
+
+        this.options = options;
+        isCursorLockEnabled = options.CursorLockEnabled;
+        decisionEngine = new AbsoluteCursorRemappingDecisionEngine(
+            options.ActiveProfile,
+            options.AbsoluteCorrectionScale);
+        decisionEngine.ResetAccumulator();
+        targetReentryGate.Reset();
+        TryReleaseCursorLock();
     }
 
     public void Enable()

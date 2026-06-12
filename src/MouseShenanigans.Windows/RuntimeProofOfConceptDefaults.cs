@@ -8,8 +8,15 @@ public static class RuntimeProofOfConceptDefaults
 
     public static RuntimeRemappingOptions CreateOptions()
     {
-        return new RuntimeRemappingOptions(
+        return CreateConfiguration().CreateRuntimeOptions();
+    }
+
+    public static RuntimeConfiguration CreateConfiguration()
+    {
+        return RuntimeConfiguration.Create(
             RuntimeTargetSelector.ForProcessName(TargetProcessName),
-            BuiltInRemappingProfiles.HorizontalInversion);
+            BuiltInRemappingProfiles.HorizontalInversion.Name,
+            cursorLockEnabled: false,
+            RemappingProfileSet.Create([BuiltInRemappingProfiles.HorizontalInversion]));
     }
 }

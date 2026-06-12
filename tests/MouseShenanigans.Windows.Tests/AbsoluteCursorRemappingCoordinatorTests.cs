@@ -264,6 +264,28 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
         Assert.Equal(1, cursorLock.ReleaseRequests);
     }
 
+    [Fact]
+    public void ApplyOptionsUsesNewProfileForLaterEligibleMovement()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(105, 50));
+        using var coordinator = CreateCoordinator(source: source, cursor: cursor);
+        coordinator.Enable();
+
+        coordinator.ApplyOptions(new RuntimeRemappingOptions(
+            RuntimeTargetSelector.ForProcessName("TargetApp"),
+            new RemappingProfile(
+                "double-right",
+                left: new MovementVector(-1, 0),
+                right: new MovementVector(2, 0),
+                up: new MovementVector(0, -1),
+                down: new MovementVector(0, 1))));
+
+        source.Raise(new IntegerMouseDelta(5, 0));
+
+        Assert.Equal([new ScreenPoint(110, 50)], cursor.SetPositions);
+    }
+
     private static AbsoluteCursorRemappingCoordinator CreateCoordinator(
         IRawMouseMovementSource? source = null,
         ITargetWindowReader? targetWindowReader = null,

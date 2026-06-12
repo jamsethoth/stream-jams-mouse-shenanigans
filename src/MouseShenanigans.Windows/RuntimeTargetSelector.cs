@@ -39,6 +39,11 @@ public sealed class RuntimeTargetSelector
         return new RuntimeTargetSelector(processName: null, windowTitleContains);
     }
 
+    public static RuntimeTargetSelector Create(string? processName, string? windowTitleContains)
+    {
+        return new RuntimeTargetSelector(processName, windowTitleContains);
+    }
+
     public RuntimeTargetEligibility Evaluate(TargetWindowSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);

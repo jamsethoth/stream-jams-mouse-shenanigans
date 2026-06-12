@@ -2,13 +2,13 @@ namespace MouseShenanigans.Windows;
 
 public sealed class RuntimeRemappingCoordinator : IRuntimeRemappingController
 {
-    private readonly RuntimeRemappingOptions options;
     private readonly IMouseMovementHook hook;
     private readonly ITargetWindowReader targetWindowReader;
     private readonly IMouseMovementInjector injector;
-    private readonly RuntimeRemappingDecisionEngine decisionEngine;
     private readonly RuntimeTargetReentryGate targetReentryGate;
     private readonly bool isSupported;
+    private RuntimeRemappingOptions options;
+    private RuntimeRemappingDecisionEngine decisionEngine;
     private bool disposed;
     private bool isCursorLockEnabled;
 
@@ -74,6 +74,18 @@ public sealed class RuntimeRemappingCoordinator : IRuntimeRemappingController
         ObjectDisposedException.ThrowIf(disposed, this);
 
         isCursorLockEnabled = enabled;
+    }
+
+    public void ApplyOptions(RuntimeRemappingOptions options)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        ArgumentNullException.ThrowIfNull(options);
+
+        this.options = options;
+        isCursorLockEnabled = options.CursorLockEnabled;
+        decisionEngine = new RuntimeRemappingDecisionEngine(options.ActiveProfile);
+        decisionEngine.ResetAccumulator();
+        targetReentryGate.Reset();
     }
 
     public void Enable()
