@@ -58,6 +58,23 @@ public sealed class TrayShutdownControllerTests
         Assert.Equal(1, exitRequests);
     }
 
+    [Fact]
+    public void RequestExitDisposesLocalControlBeforeRuntime()
+    {
+        List<string> operations = [];
+        var runtime = new RecordingRuntimeController(() => operations.Add("runtime-dispose"));
+        var localControl = new RecordingLocalControlHost(operations);
+        var controller = new TrayShutdownController(
+            runtime,
+            hideTrayIcon: () => operations.Add("hide"),
+            exitThread: () => operations.Add("exit"),
+            localControlHost: localControl);
+
+        controller.RequestExit();
+
+        Assert.Equal(["hide", "local-control-dispose", "runtime-dispose", "exit"], operations);
+    }
+
     private sealed class RecordingRuntimeController(Action? disposeAction = null) : IRuntimeRemappingController
     {
         public RuntimeRemappingStatus Status { get; } = RuntimeRemappingStatus.Disabled;
@@ -89,6 +106,14 @@ public sealed class TrayShutdownControllerTests
         {
             DisposeRequests++;
             disposeAction?.Invoke();
+        }
+    }
+
+    private sealed class RecordingLocalControlHost(List<string> operations) : IDisposable
+    {
+        public void Dispose()
+        {
+            operations.Add("local-control-dispose");
         }
     }
 }

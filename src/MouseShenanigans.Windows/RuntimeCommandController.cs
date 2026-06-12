@@ -20,6 +20,10 @@ public sealed class RuntimeCommandController
 
     public string? ConfigurationStatusMessage => configurationController?.StatusMessage;
 
+    public RuntimeRemappingStatus RuntimeStatus => runtime.Status;
+
+    public bool IsCursorLockEnabled => runtime.IsCursorLockEnabled;
+
     public void Execute(RuntimeCommand command)
     {
         switch (command)
