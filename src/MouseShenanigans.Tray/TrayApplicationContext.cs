@@ -5,11 +5,15 @@ namespace MouseShenanigans.Tray;
 internal sealed class TrayApplicationContext : ApplicationContext
 {
     private readonly AbsoluteCursorRemappingCoordinator runtime;
+    private readonly RuntimeCommandController runtimeCommandController;
     private readonly ToolStripMenuItem statusItem;
+    private readonly ToolStripMenuItem hotkeyStatusItem;
     private readonly ToolStripMenuItem enableItem;
     private readonly ToolStripMenuItem disableItem;
     private readonly ToolStripMenuItem cursorLockItem;
     private readonly TrayCursorLockController cursorLockController;
+    private readonly TrayHotkeyController hotkeyController;
+    private readonly TrayHotkeyReceiver hotkeyReceiver;
     private readonly TrayShutdownController shutdownController;
     private readonly NotifyIcon notifyIcon;
     private bool disposed;
@@ -17,7 +21,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
     public TrayApplicationContext()
     {
         runtime = CreateRuntime();
+        runtimeCommandController = new RuntimeCommandController(runtime);
         statusItem = new ToolStripMenuItem { Enabled = false };
+        hotkeyStatusItem = new ToolStripMenuItem { Enabled = false };
         enableItem = new ToolStripMenuItem("Enable remapping");
         disableItem = new ToolStripMenuItem("Disable remapping");
         cursorLockItem = new ToolStripMenuItem("Lock cursor to target")
@@ -28,16 +34,21 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         enableItem.Click += (_, _) =>
         {
-            runtime.Enable();
+            runtimeCommandController.Enable();
             UpdateRuntimeStatus();
         };
         disableItem.Click += (_, _) =>
         {
-            runtime.Disable();
+            runtimeCommandController.Disable();
             UpdateRuntimeStatus();
         };
         cursorLockItem.Click += (_, _) => cursorLockController.SetCursorLockEnabled(cursorLockItem.Checked);
         shutdownController = new TrayShutdownController(runtime, HideNotifyIcon, ExitThread);
+        hotkeyController = new TrayHotkeyController(
+            new WindowsHotkeyRegistrar(),
+            runtimeCommandController,
+            UpdateRuntimeStatus);
+        hotkeyReceiver = new TrayHotkeyReceiver(hotkeyController.DispatchHotkey);
 
         notifyIcon = new NotifyIcon
         {
@@ -46,6 +57,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
             Visible = true,
         };
 
+        hotkeyController.Register(
+            hotkeyReceiver.WindowHandle,
+            DefaultRuntimeHotkeyBindingProvider.Instance.GetBindings());
         UpdateRuntimeStatus();
     }
 
@@ -58,6 +72,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         if (disposing)
         {
+            hotkeyController.Dispose();
+            hotkeyReceiver.Dispose();
             runtime.Dispose();
             HideNotifyIcon();
             notifyIcon.Dispose();
@@ -77,6 +93,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             Items =
             {
                 statusItem,
+                hotkeyStatusItem,
                 new ToolStripSeparator(),
                 enableItem,
                 disableItem,
@@ -90,8 +107,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private void UpdateRuntimeStatus()
     {
         RuntimeRemappingStatus status = runtime.Status;
-        notifyIcon.Text = CreateTrayText(status);
-        statusItem.Text = CreateStatusText(status);
+        notifyIcon.Text = TrayStatusFormatter.CreateTrayText(status);
+        statusItem.Text = TrayStatusFormatter.CreateRuntimeStatusText(status);
+        hotkeyStatusItem.Text = TrayStatusFormatter.CreateHotkeyStatusText(
+            hotkeyController.RegistrationResult,
+            hotkeyController.LastDispatchedCommand,
+            hotkeyController.LastReceivedHotkeyId);
         enableItem.Enabled = status.State is RuntimeRemappingState.Disabled or RuntimeRemappingState.Failed;
         disableItem.Enabled = status.State == RuntimeRemappingState.Enabled;
         cursorLockItem.Checked = runtime.IsCursorLockEnabled;
@@ -110,31 +131,5 @@ internal sealed class TrayApplicationContext : ApplicationContext
             new RawInputMouseMovementSource(),
             new TargetWindowReader(),
             new WindowsCursorPositionController());
-    }
-
-    private static string CreateTrayText(RuntimeRemappingStatus status)
-    {
-        return status.State switch
-        {
-            RuntimeRemappingState.Enabled => "Mouse Shenanigans - enabled",
-            RuntimeRemappingState.Unsupported => "Mouse Shenanigans - unsupported",
-            RuntimeRemappingState.Failed => "Mouse Shenanigans - failed",
-            _ => "Mouse Shenanigans - disabled",
-        };
-    }
-
-    private static string CreateStatusText(RuntimeRemappingStatus status)
-    {
-        string stateText = status.State switch
-        {
-            RuntimeRemappingState.Enabled => $"Enabled for {RuntimeProofOfConceptDefaults.TargetProcessName}",
-            RuntimeRemappingState.Unsupported => "Unsupported desktop session",
-            RuntimeRemappingState.Failed => "Runtime failed",
-            _ => $"Disabled for {RuntimeProofOfConceptDefaults.TargetProcessName}",
-        };
-
-        return string.IsNullOrWhiteSpace(status.Message)
-            ? stateText
-            : $"{stateText}: {status.Message}";
     }
 }
