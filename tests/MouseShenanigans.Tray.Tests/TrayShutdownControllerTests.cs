@@ -24,6 +24,22 @@ public sealed class TrayShutdownControllerTests
     }
 
     [Fact]
+    public void RequestExitDisposesExitResourcesBeforeRuntimeAndExitThread()
+    {
+        var events = new List<string>();
+        var runtime = new RecordingRuntimeController(() => events.Add("runtime"));
+        var controller = new TrayShutdownController(
+            runtime,
+            hideTrayIcon: () => events.Add("hide"),
+            disposeExitResources: () => events.Add("exit-resources"),
+            exitThread: () => events.Add("thread"));
+
+        controller.RequestExit();
+
+        Assert.Equal(["hide", "exit-resources", "runtime", "thread"], events);
+    }
+
+    [Fact]
     public void RequestExitIsIdempotent()
     {
         var runtime = new RecordingRuntimeController();
@@ -42,7 +58,7 @@ public sealed class TrayShutdownControllerTests
         Assert.Equal(1, exitRequests);
     }
 
-    private sealed class RecordingRuntimeController : IRuntimeRemappingController
+    private sealed class RecordingRuntimeController(Action? disposeAction = null) : IRuntimeRemappingController
     {
         public RuntimeRemappingStatus Status { get; } = RuntimeRemappingStatus.Disabled;
 
@@ -57,6 +73,10 @@ public sealed class TrayShutdownControllerTests
             IsCursorLockEnabled = enabled;
         }
 
+        public void ApplyOptions(RuntimeRemappingOptions options)
+        {
+        }
+
         public void Enable()
         {
         }
@@ -68,6 +88,7 @@ public sealed class TrayShutdownControllerTests
         public void Dispose()
         {
             DisposeRequests++;
+            disposeAction?.Invoke();
         }
     }
 }

@@ -1,6 +1,6 @@
 ## Context
 
-The runtime proof of concept currently composes `RuntimeRemappingOptions` from `RuntimeProofOfConceptDefaults`, which hard-codes `Streamer.bot.exe` and the built-in horizontal inversion profile. Core already supports named remapping profiles and JSON profile parsing, but the tray app has no file-backed configuration or profile selection surface.
+The runtime proof of concept currently composes `RuntimeRemappingOptions` from `RuntimeProofOfConceptDefaults`, which hard-codes `Streamer.bot.exe` and a horizontal inversion profile. Core already supports named remapping profiles and JSON profile parsing, but the tray app has no file-backed configuration or profile selection surface.
 
 This slice turns the POC into a configurable utility without jumping to a full settings editor or external automation API. It should land after `add-runtime-hotkeys` so it can extend the shared runtime command boundary instead of creating a second control path.
 
@@ -8,7 +8,7 @@ This slice turns the POC into a configurable utility without jumping to a full s
 
 **Goals:**
 - Load runtime configuration from a deterministic per-user app data JSON file.
-- Preserve a built-in fallback config equivalent to today's Streamer.bot horizontal inversion behavior.
+- Preserve a fallback config equivalent to today's Streamer.bot horizontal inversion behavior without adding pass-through profile modes.
 - Validate target selection, active profile name, profile definitions, and cursor-lock default before applying a config.
 - Show available profiles in a tray submenu and allow active profile switching while the runtime is running.
 - Persist the selected active profile when changed from the tray.
@@ -57,8 +57,8 @@ Suggested shape:
 
 Keep the document shape extensible for a later top-level `hotkeys` section, but do not parse or apply configurable hotkeys in this slice. The hotkey slice should provide the binding/provider boundary; a later configuration slice can decide the exact JSON grammar, validation rules, and reload behavior for user-defined chords.
 
-### Keep fallback defaults built in
-If the config file does not exist, the tray should still start with the existing default target and built-in profile. The implementation may create a default config file for discoverability, but startup must not depend on that write succeeding.
+### Keep fallback behavior editable without pass-through modes
+If the config file does not exist, the tray should still start with the existing default target and horizontal inversion behavior. The app should not provide a built-in `normal` pass-through profile because non-remapped movement is already represented by disabling the runtime. Horizontal inversion should be part of the fallback/default configured profile data written to the editable JSON file. The implementation may create a default config file for discoverability, but startup must not depend on that write succeeding.
 
 ### Apply profile changes through runtime commands
 Profile selection and config reload should extend the shared runtime command boundary from `add-runtime-hotkeys`. That keeps tray, hotkey, and later localhost commands aligned around one state-transition path.

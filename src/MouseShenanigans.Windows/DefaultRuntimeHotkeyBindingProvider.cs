@@ -22,6 +22,10 @@ public sealed class DefaultRuntimeHotkeyBindingProvider : IHotkeyBindingProvider
                 RuntimeCommand.EmergencyDisable,
                 HotkeyModifiers.Control | HotkeyModifiers.Alt | HotkeyModifiers.Shift | HotkeyModifiers.NoRepeat,
                 Keys.F8),
+            new HotkeyBinding(
+                RuntimeCommand.CaptureForegroundTarget,
+                HotkeyModifiers.Control | HotkeyModifiers.Alt | HotkeyModifiers.NoRepeat,
+                Keys.F9),
         ];
     }
 }

@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Runtime configuration file loading
-The system SHALL load runtime target and profile configuration from one UTF-8 JSON file in a deterministic per-user app data location, with a built-in fallback when the file is absent.
+The system SHALL load runtime target and profile configuration from one UTF-8 JSON file in a deterministic per-user app data location, with a fallback configuration when the file is absent.
 
 #### Scenario: Config file exists and is valid
 - **GIVEN** a runtime configuration file exists at the per-user app data path
-- **AND** the file contains a valid target, active profile, cursor-lock default, and profile collection
+- **AND** the file contains a valid target, active profile, cursor-lock default, and configured profile collection
 - **WHEN** the tray app starts
 - **THEN** the runtime is created from that configuration
 - **AND** tray-visible status identifies the active target and profile
@@ -13,13 +13,14 @@ The system SHALL load runtime target and profile configuration from one UTF-8 JS
 #### Scenario: Config file is absent
 - **GIVEN** no runtime configuration file exists at the per-user app data path
 - **WHEN** the tray app starts
-- **THEN** the runtime uses the built-in fallback target and horizontal inversion profile
+- **THEN** the runtime uses the fallback target and configured horizontal inversion profile
+- **AND** when the per-user app data location is writable, a default runtime configuration file is created for editing
 - **AND** tray startup succeeds without requiring file creation
 
 #### Scenario: Config file is invalid at startup
 - **GIVEN** a runtime configuration file exists but fails validation
 - **WHEN** the tray app starts
-- **THEN** the runtime falls back to the built-in default configuration
+- **THEN** the runtime falls back to the default fallback configuration
 - **AND** tray-visible status reports the configuration error
 
 ### Requirement: Runtime configuration validation
@@ -41,12 +42,22 @@ The system SHALL validate the runtime configuration before applying target, prof
 - **THEN** validation fails without applying the configuration
 
 #### Scenario: Active profile exists
-- **GIVEN** the configuration names an active profile that exists in the profile collection
+- **GIVEN** the configuration names an active profile that exists in the configured profile collection
 - **WHEN** the configuration is loaded
 - **THEN** that profile is selected for runtime remapping
 
+#### Scenario: Profile collection is required
+- **GIVEN** the configuration omits profiles or contains no profiles
+- **WHEN** the configuration is loaded
+- **THEN** validation fails without applying the configuration
+
+#### Scenario: Configured profiles are loaded
+- **GIVEN** the configuration contains one or more valid custom profiles
+- **WHEN** the configuration is loaded
+- **THEN** the loaded profile collection contains the configured profiles
+
 #### Scenario: Active profile is missing
-- **GIVEN** the configuration names an active profile that is absent from the profile collection
+- **GIVEN** the configuration names an active profile that is absent from the configured profile collection
 - **WHEN** the configuration is loaded
 - **THEN** validation fails without selecting an arbitrary fallback profile from that file
 
@@ -94,6 +105,18 @@ The tray app SHALL provide a reload command that re-reads the runtime configurat
 - **THEN** the last known good configuration remains active
 - **AND** tray-visible status reports the reload error
 
+#### Scenario: Runtime command persistence preserves configured profiles
+- **GIVEN** the tray app loaded a valid runtime configuration containing configured profiles
+- **AND** multiple configured profiles are available
+- **WHEN** a runtime command persists an active-profile or target update
+- **THEN** the saved configuration keeps the configured profiles array intact
+
+#### Scenario: Configuration folder opens from tray
+- **GIVEN** the tray app is running with runtime configuration available
+- **WHEN** the user selects the open configuration folder command
+- **THEN** the tray app opens the directory containing the runtime configuration file in Windows Explorer
+- **AND** tray-visible status reports any failure to open the directory
+
 ### Requirement: Profile command integration
 The system SHALL expose profile selection and configuration reload through the same in-process runtime command boundary used by tray and hotkey runtime controls.
 
@@ -106,3 +129,29 @@ The system SHALL expose profile selection and configuration reload through the s
 - **GIVEN** the shared runtime command boundary exists
 - **WHEN** the tray reload command is selected
 - **THEN** the command boundary reloads configuration or reports the reload failure
+
+### Requirement: Focused target capture
+The system SHALL expose a hotkey command that changes the runtime target to the current foreground window without requiring the user to edit the configuration file manually.
+
+#### Scenario: Foreground process is captured
+- **GIVEN** the tray app is running with runtime configuration loaded
+- **AND** the current foreground window has a readable process name
+- **WHEN** the target-capture hotkey is pressed
+- **THEN** the runtime target selector is updated to that process name
+- **AND** the updated target selector is persisted to the runtime configuration file
+- **AND** later eligible movement uses the captured target
+
+#### Scenario: Foreground title is captured when process is unavailable
+- **GIVEN** the tray app is running with runtime configuration loaded
+- **AND** the current foreground window has no readable process name
+- **AND** the current foreground window has a readable title
+- **WHEN** the target-capture hotkey is pressed
+- **THEN** the runtime target selector is updated to that title match
+- **AND** the updated target selector is persisted to the runtime configuration file
+
+#### Scenario: Foreground target cannot be captured
+- **GIVEN** the tray app is running with runtime configuration loaded
+- **AND** the current foreground window identity is unavailable
+- **WHEN** the target-capture hotkey is pressed
+- **THEN** the last known good runtime target remains active
+- **AND** tray-visible status reports the capture failure

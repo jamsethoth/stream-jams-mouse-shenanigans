@@ -6,4 +6,5 @@ public enum RuntimeCommand
     DisableRuntime,
     ToggleRuntime,
     EmergencyDisable,
+    CaptureForegroundTarget,
 }

@@ -5,6 +5,9 @@ namespace MouseShenanigans.Windows;
 
 public sealed class TargetWindowReader : ITargetWindowReader
 {
+    private const uint GetAncestorRoot = 2;
+    private const int DwmWindowAttributeExtendedFrameBounds = 9;
+
     public TargetWindowSnapshot ReadSnapshot()
     {
         TargetWindowInfo? foregroundWindow = ReadWindow(NativeMethods.GetForegroundWindow());
@@ -27,10 +30,18 @@ public sealed class TargetWindowReader : ITargetWindowReader
             return null;
         }
 
+        windowHandle = NormalizeWindowHandle(windowHandle);
+
         return new TargetWindowInfo(
             ReadProcessName(windowHandle),
             ReadWindowTitle(windowHandle),
             ReadWindowBounds(windowHandle));
+    }
+
+    private static IntPtr NormalizeWindowHandle(IntPtr windowHandle)
+    {
+        IntPtr rootWindowHandle = NativeMethods.GetAncestor(windowHandle, GetAncestorRoot);
+        return rootWindowHandle == IntPtr.Zero ? windowHandle : rootWindowHandle;
     }
 
     private static string? ReadProcessName(IntPtr windowHandle)
@@ -77,14 +88,51 @@ public sealed class TargetWindowReader : ITargetWindowReader
 
     private static ScreenRectangle? ReadWindowBounds(IntPtr windowHandle)
     {
-        // GetWindowRect and GetCursorPos both use screen coordinates; the full window
-        // rectangle is kept as-is so right/bottom remain the exclusive containment edges.
-        if (!NativeMethods.GetWindowRect(windowHandle, out NativeRectangle rectangle))
+        if (TryReadVisibleWindowBounds(windowHandle, out ScreenRectangle visibleBounds))
         {
-            return null;
+            return visibleBounds;
         }
 
-        return new ScreenRectangle(rectangle.Left, rectangle.Top, rectangle.Right, rectangle.Bottom);
+        return TryReadWindowRectBounds(windowHandle, out ScreenRectangle windowRectBounds)
+            ? windowRectBounds
+            : null;
+    }
+
+    private static bool TryReadVisibleWindowBounds(IntPtr windowHandle, out ScreenRectangle bounds)
+    {
+        bounds = default;
+        int result = NativeMethods.DwmGetWindowAttribute(
+            windowHandle,
+            DwmWindowAttributeExtendedFrameBounds,
+            out NativeRectangle rectangle,
+            Marshal.SizeOf<NativeRectangle>());
+
+        return result == 0 && TryCreateBounds(rectangle, out bounds);
+    }
+
+    private static bool TryReadWindowRectBounds(IntPtr windowHandle, out ScreenRectangle bounds)
+    {
+        // Fallback for windows where DWM frame bounds are unavailable. Coordinates
+        // still match GetCursorPos; right/bottom remain exclusive containment edges.
+        if (!NativeMethods.GetWindowRect(windowHandle, out NativeRectangle rectangle))
+        {
+            bounds = default;
+            return false;
+        }
+
+        return TryCreateBounds(rectangle, out bounds);
+    }
+
+    private static bool TryCreateBounds(NativeRectangle rectangle, out ScreenRectangle bounds)
+    {
+        if (rectangle.Right <= rectangle.Left || rectangle.Bottom <= rectangle.Top)
+        {
+            bounds = default;
+            return false;
+        }
+
+        bounds = new ScreenRectangle(rectangle.Left, rectangle.Top, rectangle.Right, rectangle.Bottom);
+        return true;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -120,8 +168,18 @@ public sealed class TargetWindowReader : ITargetWindowReader
         internal static extern IntPtr WindowFromPoint(NativePoint point);
 
         [DllImport("user32.dll", SetLastError = true)]
+        internal static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
+
+        [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static extern bool GetWindowRect(IntPtr hWnd, out NativeRectangle rect);
+
+        [DllImport("dwmapi.dll", SetLastError = true)]
+        internal static extern int DwmGetWindowAttribute(
+            IntPtr hwnd,
+            int dwAttribute,
+            out NativeRectangle pvAttribute,
+            int cbAttribute);
 
         [DllImport("user32.dll", SetLastError = true)]
         internal static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);

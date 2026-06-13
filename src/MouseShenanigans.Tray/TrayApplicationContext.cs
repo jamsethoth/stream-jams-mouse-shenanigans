@@ -11,7 +11,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly ToolStripMenuItem enableItem;
     private readonly ToolStripMenuItem disableItem;
     private readonly ToolStripMenuItem cursorLockItem;
+    private readonly ToolStripMenuItem profileMenuItem;
+    private readonly ToolStripMenuItem reloadConfigurationItem;
+    private readonly ToolStripMenuItem openConfigurationFolderItem;
+    private readonly RuntimeConfigurationController runtimeConfigurationController;
     private readonly TrayCursorLockController cursorLockController;
+    private readonly TrayProfileMenuController profileMenuController;
+    private readonly TrayConfigurationFolderController configurationFolderController;
     private readonly TrayHotkeyController hotkeyController;
     private readonly TrayHotkeyReceiver hotkeyReceiver;
     private readonly TrayShutdownController shutdownController;
@@ -20,17 +26,32 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     public TrayApplicationContext()
     {
-        runtime = CreateRuntime();
-        runtimeCommandController = new RuntimeCommandController(runtime);
+        runtimeConfigurationController = CreateRuntimeConfigurationController();
+        runtime = CreateRuntime(runtimeConfigurationController.Current.CreateRuntimeOptions());
+        runtimeCommandController = new RuntimeCommandController(
+            runtime,
+            runtimeConfigurationController,
+            new TargetWindowReader());
         statusItem = new ToolStripMenuItem { Enabled = false };
         hotkeyStatusItem = new ToolStripMenuItem { Enabled = false };
         enableItem = new ToolStripMenuItem("Enable remapping");
         disableItem = new ToolStripMenuItem("Disable remapping");
+        profileMenuItem = new ToolStripMenuItem("Profiles");
+        reloadConfigurationItem = new ToolStripMenuItem("Reload configuration");
+        openConfigurationFolderItem = new ToolStripMenuItem("Open configuration folder");
         cursorLockItem = new ToolStripMenuItem("Lock cursor to target")
         {
             CheckOnClick = true,
         };
         cursorLockController = new TrayCursorLockController(runtime, UpdateRuntimeStatus);
+        profileMenuController = new TrayProfileMenuController(
+            profileMenuItem,
+            runtimeCommandController,
+            UpdateRuntimeStatus);
+        configurationFolderController = new TrayConfigurationFolderController(
+            runtimeConfigurationController,
+            new ExplorerConfigurationFolderLauncher(),
+            UpdateRuntimeStatus);
 
         enableItem.Click += (_, _) =>
         {
@@ -43,7 +64,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
             UpdateRuntimeStatus();
         };
         cursorLockItem.Click += (_, _) => cursorLockController.SetCursorLockEnabled(cursorLockItem.Checked);
-        shutdownController = new TrayShutdownController(runtime, HideNotifyIcon, ExitThread);
+        reloadConfigurationItem.Click += (_, _) => profileMenuController.ReloadConfiguration();
+        openConfigurationFolderItem.Click += (_, _) => configurationFolderController.OpenConfigurationFolder();
+        shutdownController = new TrayShutdownController(
+            runtime,
+            HideNotifyIcon,
+            DisposeExitResources,
+            ExitThread);
         hotkeyController = new TrayHotkeyController(
             new WindowsHotkeyRegistrar(),
             runtimeCommandController,
@@ -98,6 +125,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 enableItem,
                 disableItem,
                 cursorLockItem,
+                profileMenuItem,
+                reloadConfigurationItem,
+                openConfigurationFolderItem,
                 new ToolStripSeparator(),
                 exitItem,
             },
@@ -108,15 +138,20 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         RuntimeRemappingStatus status = runtime.Status;
         notifyIcon.Text = TrayStatusFormatter.CreateTrayText(status);
-        statusItem.Text = TrayStatusFormatter.CreateRuntimeStatusText(status);
+        statusItem.Text = TrayStatusFormatter.CreateRuntimeStatusText(
+            status,
+            runtimeConfigurationController.Current,
+            runtimeConfigurationController.StatusMessage);
         hotkeyStatusItem.Text = TrayStatusFormatter.CreateHotkeyStatusText(
             hotkeyController.RegistrationResult,
             hotkeyController.LastDispatchedCommand,
             hotkeyController.LastReceivedHotkeyId);
+        profileMenuController.RefreshProfiles();
         enableItem.Enabled = status.State is RuntimeRemappingState.Disabled or RuntimeRemappingState.Failed;
         disableItem.Enabled = status.State == RuntimeRemappingState.Enabled;
         cursorLockItem.Checked = runtime.IsCursorLockEnabled;
         cursorLockItem.Enabled = status.State != RuntimeRemappingState.Unsupported;
+        reloadConfigurationItem.Enabled = status.State != RuntimeRemappingState.Unsupported;
     }
 
     private void HideNotifyIcon()
@@ -124,12 +159,28 @@ internal sealed class TrayApplicationContext : ApplicationContext
         notifyIcon.Visible = false;
     }
 
-    private static AbsoluteCursorRemappingCoordinator CreateRuntime()
+    private void DisposeExitResources()
+    {
+        hotkeyController.Dispose();
+        hotkeyReceiver.Dispose();
+    }
+
+    private static AbsoluteCursorRemappingCoordinator CreateRuntime(RuntimeRemappingOptions options)
     {
         return new AbsoluteCursorRemappingCoordinator(
-            RuntimeProofOfConceptDefaults.CreateOptions(),
+            options,
             new RawInputMouseMovementSource(),
             new TargetWindowReader(),
-            new WindowsCursorPositionController());
+            new WindowsCursorPositionController(),
+            new WindowsCursorLockController(),
+            SystemRuntimeClock.Instance,
+            WindowsRuntime.IsDesktopInputAvailable);
+    }
+
+    private static RuntimeConfigurationController CreateRuntimeConfigurationController()
+    {
+        return new RuntimeConfigurationController(
+            new RuntimeConfigurationFileStore(new RuntimeConfigurationPathProvider()),
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
     }
 }

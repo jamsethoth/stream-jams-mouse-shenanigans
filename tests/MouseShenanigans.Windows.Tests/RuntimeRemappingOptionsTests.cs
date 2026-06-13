@@ -5,12 +5,19 @@ namespace MouseShenanigans.Windows.Tests;
 
 public sealed class RuntimeRemappingOptionsTests
 {
+    private static readonly RemappingProfile TestProfile = new(
+        "test-profile",
+        left: new MovementVector(-1, 0),
+        right: new MovementVector(1, 0),
+        up: new MovementVector(0, -1),
+        down: new MovementVector(0, 1));
+
     [Fact]
     public void ConstructorStoresAbsoluteCorrectionScale()
     {
         var options = new RuntimeRemappingOptions(
             RuntimeTargetSelector.ForProcessName("TargetApp"),
-            BuiltInRemappingProfiles.HorizontalInversion,
+            TestProfile,
             absoluteCorrectionScale: 0.75);
 
         Assert.Equal(0.75, options.AbsoluteCorrectionScale);
@@ -22,7 +29,7 @@ public sealed class RuntimeRemappingOptionsTests
     {
         var options = new RuntimeRemappingOptions(
             RuntimeTargetSelector.ForProcessName("TargetApp"),
-            BuiltInRemappingProfiles.HorizontalInversion);
+            TestProfile);
 
         Assert.False(options.CursorLockEnabled);
     }
@@ -32,7 +39,7 @@ public sealed class RuntimeRemappingOptionsTests
     {
         var options = new RuntimeRemappingOptions(
             RuntimeTargetSelector.ForProcessName("TargetApp"),
-            BuiltInRemappingProfiles.HorizontalInversion,
+            TestProfile,
             cursorLockEnabled: true);
 
         Assert.True(options.CursorLockEnabled);
@@ -47,7 +54,8 @@ public sealed class RuntimeRemappingOptionsTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new RuntimeRemappingOptions(
             RuntimeTargetSelector.ForProcessName("TargetApp"),
-            BuiltInRemappingProfiles.HorizontalInversion,
+            TestProfile,
             absoluteCorrectionScale));
     }
+
 }

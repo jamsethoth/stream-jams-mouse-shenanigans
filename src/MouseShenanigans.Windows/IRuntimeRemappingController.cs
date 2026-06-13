@@ -8,6 +8,8 @@ public interface IRuntimeRemappingController : IDisposable
 
     void SetCursorLockEnabled(bool enabled);
 
+    void ApplyOptions(RuntimeRemappingOptions options);
+
     void Enable();
 
     void Disable();

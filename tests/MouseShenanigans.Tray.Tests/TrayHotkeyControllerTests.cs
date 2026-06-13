@@ -141,6 +141,10 @@ public sealed class TrayHotkeyControllerTests
             IsCursorLockEnabled = enabled;
         }
 
+        public void ApplyOptions(RuntimeRemappingOptions options)
+        {
+        }
+
         public void Enable()
         {
             EnableRequests++;

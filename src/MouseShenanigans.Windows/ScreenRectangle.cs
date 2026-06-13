@@ -35,4 +35,14 @@ public readonly record struct ScreenRectangle
             && point.Y >= Top
             && point.Y < Bottom;
     }
+
+    public ScreenPoint Clamp(ScreenPoint point)
+    {
+        int maxX = Right > Left ? Right - 1 : Left;
+        int maxY = Bottom > Top ? Bottom - 1 : Top;
+
+        return new ScreenPoint(
+            Math.Clamp(point.X, Left, maxX),
+            Math.Clamp(point.Y, Top, maxY));
+    }
 }
