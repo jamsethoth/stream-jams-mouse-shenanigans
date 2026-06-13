@@ -461,7 +461,7 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
 
         coordinator.ApplyOptions(new RuntimeRemappingOptions(
             RuntimeTargetSelector.ForProcessName("TargetApp"),
-            BuiltInRemappingProfiles.HorizontalInversion));
+            RuntimeProofOfConceptDefaults.HorizontalInversionProfile));
         reader.Snapshot = TargetSnapshot(new ScreenPoint(105, 50));
         cursor.Position = new ScreenPoint(105, 50);
 
@@ -482,7 +482,7 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
     {
         var options = new RuntimeRemappingOptions(
             RuntimeTargetSelector.ForProcessName("TargetApp"),
-            BuiltInRemappingProfiles.HorizontalInversion);
+            RuntimeProofOfConceptDefaults.HorizontalInversionProfile);
 
         return new AbsoluteCursorRemappingCoordinator(
             options,

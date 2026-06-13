@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Runtime configuration file loading
-The system SHALL load runtime target and profile configuration from one UTF-8 JSON file in a deterministic per-user app data location, with a built-in fallback when the file is absent.
+The system SHALL load runtime target and profile configuration from one UTF-8 JSON file in a deterministic per-user app data location, with a fallback configuration when the file is absent.
 
 #### Scenario: Config file exists and is valid
 - **GIVEN** a runtime configuration file exists at the per-user app data path
-- **AND** the file contains a valid target, active profile, cursor-lock default, and optional custom profile collection
+- **AND** the file contains a valid target, active profile, cursor-lock default, and configured profile collection
 - **WHEN** the tray app starts
 - **THEN** the runtime is created from that configuration
 - **AND** tray-visible status identifies the active target and profile
@@ -13,14 +13,14 @@ The system SHALL load runtime target and profile configuration from one UTF-8 JS
 #### Scenario: Config file is absent
 - **GIVEN** no runtime configuration file exists at the per-user app data path
 - **WHEN** the tray app starts
-- **THEN** the runtime uses the built-in fallback target and horizontal inversion profile
+- **THEN** the runtime uses the fallback target and configured horizontal inversion profile
 - **AND** when the per-user app data location is writable, a default runtime configuration file is created for editing
 - **AND** tray startup succeeds without requiring file creation
 
 #### Scenario: Config file is invalid at startup
 - **GIVEN** a runtime configuration file exists but fails validation
 - **WHEN** the tray app starts
-- **THEN** the runtime falls back to the built-in default configuration
+- **THEN** the runtime falls back to the default fallback configuration
 - **AND** tray-visible status reports the configuration error
 
 ### Requirement: Runtime configuration validation
@@ -42,22 +42,22 @@ The system SHALL validate the runtime configuration before applying target, prof
 - **THEN** validation fails without applying the configuration
 
 #### Scenario: Active profile exists
-- **GIVEN** the configuration names an active profile that exists in the built-in profile catalog or configured custom profile collection
+- **GIVEN** the configuration names an active profile that exists in the configured profile collection
 - **WHEN** the configuration is loaded
 - **THEN** that profile is selected for runtime remapping
 
-#### Scenario: Built-in profile is always available
-- **GIVEN** the configuration omits custom profiles or contains no custom profiles
+#### Scenario: Profile collection is required
+- **GIVEN** the configuration omits profiles or contains no profiles
 - **WHEN** the configuration is loaded
-- **THEN** the built-in horizontal inversion profile remains available for runtime remapping and tray profile selection
+- **THEN** validation fails without applying the configuration
 
-#### Scenario: Custom profiles are additive
+#### Scenario: Configured profiles are loaded
 - **GIVEN** the configuration contains one or more valid custom profiles
 - **WHEN** the configuration is loaded
-- **THEN** the loaded profile collection contains the built-in horizontal inversion profile and the configured custom profiles
+- **THEN** the loaded profile collection contains the configured profiles
 
 #### Scenario: Active profile is missing
-- **GIVEN** the configuration names an active profile that is absent from both the built-in profile catalog and configured custom profile collection
+- **GIVEN** the configuration names an active profile that is absent from the configured profile collection
 - **WHEN** the configuration is loaded
 - **THEN** validation fails without selecting an arbitrary fallback profile from that file
 
@@ -104,6 +104,18 @@ The tray app SHALL provide a reload command that re-reads the runtime configurat
 - **WHEN** the user selects reload configuration
 - **THEN** the last known good configuration remains active
 - **AND** tray-visible status reports the reload error
+
+#### Scenario: Runtime command persistence preserves configured profiles
+- **GIVEN** the tray app loaded a valid runtime configuration containing configured profiles
+- **AND** multiple configured profiles are available
+- **WHEN** a runtime command persists an active-profile or target update
+- **THEN** the saved configuration keeps the configured profiles array intact
+
+#### Scenario: Configuration folder opens from tray
+- **GIVEN** the tray app is running with runtime configuration available
+- **WHEN** the user selects the open configuration folder command
+- **THEN** the tray app opens the directory containing the runtime configuration file in Windows Explorer
+- **AND** tray-visible status reports any failure to open the directory
 
 ### Requirement: Profile command integration
 The system SHALL expose profile selection and configuration reload through the same in-process runtime command boundary used by tray and hotkey runtime controls.

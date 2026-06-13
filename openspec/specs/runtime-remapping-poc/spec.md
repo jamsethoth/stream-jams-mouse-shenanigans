@@ -32,6 +32,24 @@ The system SHALL provide a Windows-only proof-of-concept runtime that can be ena
 - **WHEN** the tray host exits
 - **THEN** the runtime releases any installed mouse observation boundary or native handle it owns
 
+### Requirement: Configured runtime composition
+The proof-of-concept runtime SHALL compose target selection, active remapping profile, and cursor-lock default from loaded runtime configuration instead of only using hard-coded proof-of-concept defaults.
+
+#### Scenario: Runtime uses configured target
+- **GIVEN** a valid runtime configuration specifies a target process name or title match
+- **WHEN** the tray app creates the runtime
+- **THEN** target-window gating uses the configured target selector
+
+#### Scenario: Runtime uses configured active profile
+- **GIVEN** a valid runtime configuration specifies an active profile
+- **WHEN** eligible mouse movement is observed
+- **THEN** runtime remapping uses the configured active profile
+
+#### Scenario: Runtime retains fallback defaults
+- **GIVEN** no valid runtime configuration is available
+- **WHEN** the tray app creates the runtime
+- **THEN** the existing Streamer.bot horizontal inversion fallback remains available for proof-of-concept validation
+
 ### Requirement: Target-window gating
 The system SHALL apply runtime remapping only when one configured third-party target process name or window-title match is foreground or under the cursor and the cursor is inside readable target window bounds.
 
@@ -90,7 +108,7 @@ The system SHALL apply runtime remapping only when one configured third-party ta
 The system SHALL apply the active core remapping profile to targeted observed mouse movement and write the corrected cursor output through standard user-session Win32 APIs.
 
 #### Scenario: Targeted movement is remapped
-- **GIVEN** the runtime is enabled with the built-in horizontal inversion profile
+- **GIVEN** the runtime is enabled with an active horizontal inversion profile from runtime configuration
 - **AND** the configured target matches
 - **WHEN** ordinary rightward mouse movement is observed
 - **THEN** the runtime applies equivalent leftward cursor output through the active Windows boundary
@@ -110,7 +128,7 @@ The system SHALL apply the active core remapping profile to targeted observed mo
 - **AND** the active remapping profile remains unchanged
 
 #### Scenario: Vertical movement is preserved by active profile
-- **GIVEN** the runtime is enabled with the built-in horizontal inversion profile
+- **GIVEN** the runtime is enabled with an active horizontal inversion profile from runtime configuration
 - **AND** the configured target matches
 - **WHEN** ordinary vertical mouse movement is observed
 - **THEN** the runtime preserves the final vertical cursor movement

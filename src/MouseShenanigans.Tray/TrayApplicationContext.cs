@@ -13,9 +13,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly ToolStripMenuItem cursorLockItem;
     private readonly ToolStripMenuItem profileMenuItem;
     private readonly ToolStripMenuItem reloadConfigurationItem;
+    private readonly ToolStripMenuItem openConfigurationFolderItem;
     private readonly RuntimeConfigurationController runtimeConfigurationController;
     private readonly TrayCursorLockController cursorLockController;
     private readonly TrayProfileMenuController profileMenuController;
+    private readonly TrayConfigurationFolderController configurationFolderController;
     private readonly TrayHotkeyController hotkeyController;
     private readonly TrayHotkeyReceiver hotkeyReceiver;
     private readonly TrayShutdownController shutdownController;
@@ -36,6 +38,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         disableItem = new ToolStripMenuItem("Disable remapping");
         profileMenuItem = new ToolStripMenuItem("Profiles");
         reloadConfigurationItem = new ToolStripMenuItem("Reload configuration");
+        openConfigurationFolderItem = new ToolStripMenuItem("Open configuration folder");
         cursorLockItem = new ToolStripMenuItem("Lock cursor to target")
         {
             CheckOnClick = true,
@@ -44,6 +47,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
         profileMenuController = new TrayProfileMenuController(
             profileMenuItem,
             runtimeCommandController,
+            UpdateRuntimeStatus);
+        configurationFolderController = new TrayConfigurationFolderController(
+            runtimeConfigurationController,
+            new ExplorerConfigurationFolderLauncher(),
             UpdateRuntimeStatus);
 
         enableItem.Click += (_, _) =>
@@ -58,6 +65,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         };
         cursorLockItem.Click += (_, _) => cursorLockController.SetCursorLockEnabled(cursorLockItem.Checked);
         reloadConfigurationItem.Click += (_, _) => profileMenuController.ReloadConfiguration();
+        openConfigurationFolderItem.Click += (_, _) => configurationFolderController.OpenConfigurationFolder();
         shutdownController = new TrayShutdownController(
             runtime,
             HideNotifyIcon,
@@ -119,6 +127,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 cursorLockItem,
                 profileMenuItem,
                 reloadConfigurationItem,
+                openConfigurationFolderItem,
                 new ToolStripSeparator(),
                 exitItem,
             },

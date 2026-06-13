@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define pure core remapping profile behavior: profile value objects, profile collections, built-in presets, delta remapping, JSON profile parsing, and the boundary that keeps runtime input hooks and tray controls out of the core profile slice.
+Define pure core remapping profile behavior: profile value objects, profile collections, delta remapping, JSON profile parsing, and the boundary that keeps runtime input hooks and tray controls out of the core profile slice.
 
 ## Requirements
 
@@ -44,23 +44,17 @@ The system SHALL validate a profile collection before use and SHALL reject dupli
 - **WHEN** a caller requests a profile name that is not present in the collection
 - **THEN** the request fails without selecting an arbitrary fallback profile
 
-### Requirement: Built-in horizontal inversion preset
-The system SHALL provide a built-in horizontal inversion profile that reverses horizontal movement while preserving vertical movement.
+### Requirement: No built-in selectable remapping preset
+The system SHALL NOT provide built-in selectable remapping profiles; selectable remapping profiles SHALL come from runtime configuration.
 
-#### Scenario: Right movement is inverted
-- **WHEN** the horizontal inversion preset remaps a positive horizontal delta
-- **THEN** the output horizontal delta is negative with the same magnitude
-- **AND** the output vertical delta is zero
+#### Scenario: Built-in catalog is empty
+- **WHEN** the built-in profile catalog is inspected
+- **THEN** it contains no profiles
 
-#### Scenario: Left movement is inverted
-- **WHEN** the horizontal inversion preset remaps a negative horizontal delta
-- **THEN** the output horizontal delta is positive with the same magnitude
-- **AND** the output vertical delta is zero
-
-#### Scenario: Vertical movement is preserved
-- **WHEN** the horizontal inversion preset remaps vertical movement
-- **THEN** the output vertical delta has the same sign and magnitude as the input vertical delta
-- **AND** the output horizontal delta is zero
+#### Scenario: Disabled runtime represents no remapping
+- **GIVEN** the user does not want remapping behavior applied
+- **WHEN** the runtime is disabled
+- **THEN** observed movement is not remapped by a pass-through profile
 
 ### Requirement: Delta remapping
 The system SHALL transform raw mouse deltas by decomposing input into directional components and summing each component multiplied by the active profile's configured output vector.

@@ -75,10 +75,7 @@ public static class RuntimeConfigurationJsonSerializer
             },
             ActiveProfile = configuration.ActiveProfileName,
             CursorLockEnabled = configuration.CursorLockEnabled,
-            Profiles = configuration.Profiles.Profiles
-                .Where(profile => !RuntimeConfiguration.IsBuiltInProfileName(profile.Name))
-                .Select(ToDto)
-                .ToArray(),
+            Profiles = configuration.ConfiguredProfiles.Select(ToDto).ToArray(),
         };
 
         return JsonSerializer.Serialize(document, JsonOptions);

@@ -4,6 +4,7 @@
 - [x] 1.2 Add validation for missing target selector, missing active profile, invalid profile collection, duplicate profile names, and invalid cursor-lock settings.
 - [x] 1.3 Add a fallback configuration equivalent to the current Streamer.bot horizontal inversion proof-of-concept defaults.
 - [x] 1.4 Add unit tests for valid config, absent config fallback, invalid target, missing active profile, and invalid profile collection.
+- [x] 1.5 Remove built-in default profiles while keeping horizontal inversion as fallback configured profile data.
 
 ## 2. Configuration File IO
 
@@ -19,6 +20,7 @@
 - [x] 3.2 Ensure profile selection resets movement accumulators and target re-entry state as needed.
 - [x] 3.3 Add command-boundary operations for select profile and reload configuration, building on `add-runtime-hotkeys` shared commands.
 - [x] 3.4 Add unit tests proving later eligible movement uses the newly selected profile while the runtime remains enabled.
+- [x] 3.5 Preserve the configured profile JSON collection when runtime commands persist profile or target updates.
 
 ## 4. Tray Profile Controls
 
@@ -28,6 +30,7 @@
 - [x] 4.4 Add a tray reload configuration command.
 - [x] 4.5 On reload failure, keep the last known good configuration active and show tray-visible error status.
 - [x] 4.6 Add tray/controller tests for profile list rendering seams, profile selection, reload success, reload failure, and config-save failure where practical.
+- [x] 4.7 Add a tray command to open the runtime configuration directory in Windows Explorer.
 
 ## 5. Automated Validation
 
@@ -39,13 +42,14 @@
 
 ## 6. Manual Windows Proof-Of-Concept Verification
 
-- [ ] 6.1 Start with no config file and verify the tray app still uses the Streamer.bot horizontal inversion fallback.
-- [ ] 6.2 Add a valid config file with multiple profiles and verify the tray lists all profiles.
-- [ ] 6.3 Switch profiles from the tray while runtime is enabled and verify later eligible movement uses the new profile.
-- [ ] 6.4 Verify selected profile persists after tray restart.
-- [ ] 6.5 Edit config to a valid new target/profile set, reload from tray, and verify the new configuration applies without process restart.
-- [ ] 6.6 Edit config to invalid JSON, reload from tray, and verify the last known good configuration remains active with an error status.
-- [ ] 6.7 Record any file permission, path, reload, or profile-switching limitation found during manual testing.
+- [x] 6.1 Start with no config file and verify the tray app still uses the Streamer.bot horizontal inversion fallback.
+- [x] 6.2 Add a valid config file with multiple profiles and verify the tray lists all profiles.
+- [x] 6.3 Switch profiles from the tray while runtime is enabled and verify later eligible movement uses the new profile.
+- [x] 6.4 Verify selected profile persists after tray restart.
+- [x] 6.5 Edit config to a valid new target/profile set, reload from tray, and verify the new configuration applies without process restart.
+- [x] 6.6 Edit config to invalid JSON, reload from tray, and verify the last known good configuration remains active with an error status.
+- [x] 6.7 Record any file permission, path, reload, or profile-switching limitation found during manual testing.
+- [x] 6.8 Select the tray command to open the runtime configuration folder and verify Explorer opens to the config directory.
 
 ## 7. Focused Target Capture Hotkey
 
@@ -53,4 +57,4 @@
 - [x] 7.2 Persist captured targets through the runtime configuration controller.
 - [x] 7.3 Register a default target-capture hotkey.
 - [x] 7.4 Add automated tests for process capture, title fallback, capture failure, and default binding coverage.
-- [ ] 7.5 Manually verify pressing the target-capture hotkey changes the active target and persists it after restart.
+- [x] 7.5 Manually verify pressing the target-capture hotkey changes the active target and persists it after restart.

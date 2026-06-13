@@ -14,10 +14,16 @@ public sealed class RuntimeConfigurationTests
         Assert.Equal("horizontal-inversion", configuration.ActiveProfileName);
         Assert.True(configuration.CursorLockEnabled);
         Assert.Equal("horizontal-inversion", configuration.ActiveProfile.Name);
+        Assert.Collection(
+            configuration.ProfileNames,
+            profileName => Assert.Equal("horizontal-inversion", profileName));
+        Assert.Collection(
+            configuration.ConfiguredProfiles,
+            profile => Assert.Equal("horizontal-inversion", profile.Name));
     }
 
     [Fact]
-    public void DeserializeConfigWithNoCustomProfilesKeepsBuiltInProfileAvailable()
+    public void DeserializeRejectsEmptyProfileCollection()
     {
         const string json = """
             {
@@ -28,15 +34,11 @@ public sealed class RuntimeConfigurationTests
             }
             """;
 
-        RuntimeConfiguration configuration = RuntimeConfigurationJsonSerializer.Deserialize(json);
-
-        Assert.Equal("horizontal-inversion", configuration.ActiveProfileName);
-        Assert.Equal(BuiltInRemappingProfiles.HorizontalInversion.Name, configuration.ActiveProfile.Name);
-        Assert.Contains(BuiltInRemappingProfiles.HorizontalInversion.Name, configuration.ProfileNames);
+        Assert.Throws<InvalidDataException>(() => RuntimeConfigurationJsonSerializer.Deserialize(json));
     }
 
     [Fact]
-    public void DeserializeConfigAddsCustomProfilesToBuiltInProfiles()
+    public void DeserializeConfigUsesConfiguredProfiles()
     {
         const string json = """
             {
@@ -60,8 +62,10 @@ public sealed class RuntimeConfigurationTests
         Assert.Equal("double-right", configuration.ActiveProfileName);
         Assert.Collection(
             configuration.ProfileNames,
-            profileName => Assert.Equal("horizontal-inversion", profileName),
             profileName => Assert.Equal("double-right", profileName));
+        Assert.Collection(
+            configuration.ConfiguredProfiles,
+            profileName => Assert.Equal("double-right", profileName.Name));
     }
 
     [Fact]
@@ -125,11 +129,44 @@ public sealed class RuntimeConfigurationTests
     }
 
     [Fact]
-    public void SerializeOmitsBuiltInProfiles()
+    public void SerializeWritesConfiguredProfiles()
     {
-        string json = RuntimeConfigurationJsonSerializer.Serialize(RuntimeProofOfConceptDefaults.CreateConfiguration());
+        RuntimeConfiguration configuration = RuntimeConfiguration.CreateFromConfiguredProfiles(
+            RuntimeTargetSelector.ForProcessName("Streamer.bot.exe"),
+            RuntimeProofOfConceptDefaults.ActiveProfileName,
+            cursorLockEnabled: true,
+            [RuntimeProofOfConceptDefaults.HorizontalInversionProfile]);
 
-        Assert.Contains("\"profiles\": []", json, StringComparison.Ordinal);
+        string json = RuntimeConfigurationJsonSerializer.Serialize(configuration);
+
+        Assert.Contains("\"name\": \"horizontal-inversion\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SerializePreservesConfiguredProfilesAfterDeserialize()
+    {
+        RuntimeConfiguration configuration = RuntimeConfigurationJsonSerializer.Deserialize(MultipleProfilesJson);
+
+        string json = RuntimeConfigurationJsonSerializer.Serialize(configuration);
+
+        Assert.Contains("\"name\": \"horizontal-inversion\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"name\": \"double-right\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WithTargetSelectorKeepsConfiguredProfiles()
+    {
+        RuntimeConfiguration configuration = RuntimeConfigurationJsonSerializer.Deserialize(MultipleProfilesJson);
+
+        RuntimeConfiguration updated = configuration.WithTargetSelector(RuntimeTargetSelector.ForProcessName("notepad"));
+
+        Assert.Equal("notepad", updated.TargetSelector.ProcessName);
+        Assert.Equal(configuration.ActiveProfileName, updated.ActiveProfileName);
+        Assert.Equal(configuration.CursorLockEnabled, updated.CursorLockEnabled);
+        Assert.Equal(configuration.ProfileNames, updated.ProfileNames);
+        Assert.Equal(
+            configuration.ConfiguredProfiles.Select(profile => profile.Name),
+            updated.ConfiguredProfiles.Select(profile => profile.Name));
     }
 
     [Fact]
@@ -138,9 +175,15 @@ public sealed class RuntimeConfigurationTests
         RuntimeConfiguration configuration = RuntimeProofOfConceptDefaults.CreateConfiguration();
 
         Assert.Equal("Streamer.bot", configuration.TargetSelector.ProcessName);
-        Assert.Equal(BuiltInRemappingProfiles.HorizontalInversion.Name, configuration.ActiveProfileName);
+        Assert.Equal(RuntimeProofOfConceptDefaults.ActiveProfileName, configuration.ActiveProfileName);
         Assert.True(configuration.CursorLockEnabled);
-        Assert.Same(BuiltInRemappingProfiles.HorizontalInversion, configuration.ActiveProfile);
+        Assert.Equal(RuntimeProofOfConceptDefaults.HorizontalInversionProfile, configuration.ActiveProfile);
+        Assert.Collection(
+            configuration.ProfileNames,
+            profileName => Assert.Equal("horizontal-inversion", profileName));
+        Assert.Collection(
+            configuration.ConfiguredProfiles,
+            profile => Assert.Equal("horizontal-inversion", profile.Name));
     }
 
     [Fact]
@@ -169,6 +212,33 @@ public sealed class RuntimeConfigurationTests
               "name": "horizontal-inversion",
               "left": { "x": 1, "y": 0 },
               "right": { "x": -1, "y": 0 },
+              "up": { "x": 0, "y": -1 },
+              "down": { "x": 0, "y": 1 }
+            }
+          ]
+        }
+        """;
+
+    private const string MultipleProfilesJson = """
+        {
+          "target": {
+            "processName": "Streamer.bot.exe",
+            "windowTitleContains": null
+          },
+          "activeProfile": "double-right",
+          "cursorLockEnabled": true,
+          "profiles": [
+            {
+              "name": "horizontal-inversion",
+              "left": { "x": 1, "y": 0 },
+              "right": { "x": -1, "y": 0 },
+              "up": { "x": 0, "y": -1 },
+              "down": { "x": 0, "y": 1 }
+            },
+            {
+              "name": "double-right",
+              "left": { "x": -1, "y": 0 },
+              "right": { "x": 2, "y": 0 },
               "up": { "x": 0, "y": -1 },
               "down": { "x": 0, "y": 1 }
             }

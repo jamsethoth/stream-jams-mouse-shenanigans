@@ -18,6 +18,9 @@ public sealed class RuntimeConfigurationControllerTests
         Assert.Equal("double-right", controller.Current.ActiveProfileName);
         Assert.Single(store.SavedConfigurations);
         Assert.Equal("double-right", store.SavedConfigurations[0].ActiveProfileName);
+        Assert.Equal(
+            configuration.ConfiguredProfiles.Select(profile => profile.Name),
+            store.SavedConfigurations[0].ConfiguredProfiles.Select(profile => profile.Name));
     }
 
     [Fact]
@@ -50,6 +53,9 @@ public sealed class RuntimeConfigurationControllerTests
         Assert.Equal("notepad", controller.Current.TargetSelector.ProcessName);
         Assert.Single(store.SavedConfigurations);
         Assert.Equal("notepad", store.SavedConfigurations[0].TargetSelector.ProcessName);
+        Assert.Equal(
+            configuration.ConfiguredProfiles.Select(profile => profile.Name),
+            store.SavedConfigurations[0].ConfiguredProfiles.Select(profile => profile.Name));
     }
 
     [Fact]
@@ -112,9 +118,9 @@ public sealed class RuntimeConfigurationControllerTests
 
         return RuntimeConfiguration.Create(
             RuntimeTargetSelector.ForProcessName("TargetApp.exe"),
-            BuiltInRemappingProfiles.HorizontalInversion.Name,
+            RuntimeProofOfConceptDefaults.ActiveProfileName,
             cursorLockEnabled: false,
-            RemappingProfileSet.Create([BuiltInRemappingProfiles.HorizontalInversion, doubleRight]));
+            RemappingProfileSet.Create([RuntimeProofOfConceptDefaults.HorizontalInversionProfile, doubleRight]));
     }
 
     private sealed class RecordingConfigurationStore(RuntimeConfiguration initialConfiguration) : IRuntimeConfigurationStore

@@ -146,9 +146,9 @@ public sealed class TrayProfileMenuControllerTests
 
         return RuntimeConfiguration.Create(
             RuntimeTargetSelector.ForProcessName("TargetApp.exe"),
-            BuiltInRemappingProfiles.HorizontalInversion.Name,
+            RuntimeProofOfConceptDefaults.ActiveProfileName,
             cursorLockEnabled: false,
-            RemappingProfileSet.Create([BuiltInRemappingProfiles.HorizontalInversion, doubleRight]));
+            RemappingProfileSet.Create([RuntimeProofOfConceptDefaults.HorizontalInversionProfile, doubleRight]));
     }
 
     private sealed class RecordingConfigurationStore(RuntimeConfiguration initialConfiguration) : IRuntimeConfigurationStore

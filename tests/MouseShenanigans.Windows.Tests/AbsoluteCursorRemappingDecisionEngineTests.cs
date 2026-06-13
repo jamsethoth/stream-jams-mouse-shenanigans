@@ -8,7 +8,8 @@ public sealed class AbsoluteCursorRemappingDecisionEngineTests
     [Fact]
     public void DecideMovesCursorToAbsoluteRemappedPositionForHorizontalInversion()
     {
-        var engine = new AbsoluteCursorRemappingDecisionEngine(BuiltInRemappingProfiles.HorizontalInversion);
+        var engine = new AbsoluteCursorRemappingDecisionEngine(
+            RuntimeProofOfConceptDefaults.HorizontalInversionProfile);
 
         AbsoluteCursorRemappingDecision decision = engine.Decide(
             new RuntimeMouseMovement(dx: 5, dy: 0),
@@ -24,7 +25,7 @@ public sealed class AbsoluteCursorRemappingDecisionEngineTests
     public void DecideScalesAbsoluteCorrectionForMouseDpiCalibration()
     {
         var engine = new AbsoluteCursorRemappingDecisionEngine(
-            BuiltInRemappingProfiles.HorizontalInversion,
+            RuntimeProofOfConceptDefaults.HorizontalInversionProfile,
             absoluteCorrectionScale: 0.5);
 
         AbsoluteCursorRemappingDecision decision = engine.Decide(
@@ -39,7 +40,8 @@ public sealed class AbsoluteCursorRemappingDecisionEngineTests
     [Fact]
     public void DecideKeepsCursorWhereItAlreadyIsWhenProfilePreservesMovement()
     {
-        var engine = new AbsoluteCursorRemappingDecisionEngine(BuiltInRemappingProfiles.HorizontalInversion);
+        var engine = new AbsoluteCursorRemappingDecisionEngine(
+            RuntimeProofOfConceptDefaults.HorizontalInversionProfile);
 
         AbsoluteCursorRemappingDecision decision = engine.Decide(
             new RuntimeMouseMovement(dx: 0, dy: 5),
@@ -73,7 +75,8 @@ public sealed class AbsoluteCursorRemappingDecisionEngineTests
     [Fact]
     public void DecidePassesThroughWhenDisabledOrTargetDoesNotMatch()
     {
-        var engine = new AbsoluteCursorRemappingDecisionEngine(BuiltInRemappingProfiles.HorizontalInversion);
+        var engine = new AbsoluteCursorRemappingDecisionEngine(
+            RuntimeProofOfConceptDefaults.HorizontalInversionProfile);
 
         Assert.Null(engine.Decide(
             new RuntimeMouseMovement(dx: 5, dy: 0),

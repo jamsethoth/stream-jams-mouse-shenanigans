@@ -4,13 +4,26 @@ namespace MouseShenanigans.Core.Tests;
 
 public sealed class RemappingEngineTests
 {
+    private static readonly RemappingProfile HorizontalInversionProfile = new(
+        "horizontal-inversion",
+        left: new MovementVector(1, 0),
+        right: new MovementVector(-1, 0),
+        up: new MovementVector(0, -1),
+        down: new MovementVector(0, 1));
+
+    [Fact]
+    public void BuiltInProfileCatalogIsEmpty()
+    {
+        Assert.Empty(BuiltInRemappingProfiles.All);
+    }
+
     [Fact]
     public void HorizontalInversionReversesRightwardMovement()
     {
         RemappedMouseDelta output = RemappingEngine.Remap(
             dx: 5,
             dy: 0,
-            profile: BuiltInRemappingProfiles.HorizontalInversion);
+            profile: HorizontalInversionProfile);
 
         Assert.Equal(-5, output.Dx);
         Assert.Equal(0, output.Dy);
@@ -22,7 +35,7 @@ public sealed class RemappingEngineTests
         RemappedMouseDelta output = RemappingEngine.Remap(
             dx: -7,
             dy: 0,
-            profile: BuiltInRemappingProfiles.HorizontalInversion);
+            profile: HorizontalInversionProfile);
 
         Assert.Equal(7, output.Dx);
         Assert.Equal(0, output.Dy);
@@ -34,7 +47,7 @@ public sealed class RemappingEngineTests
         RemappedMouseDelta output = RemappingEngine.Remap(
             dx: 0,
             dy: -4,
-            profile: BuiltInRemappingProfiles.HorizontalInversion);
+            profile: HorizontalInversionProfile);
 
         Assert.Equal(0, output.Dx);
         Assert.Equal(-4, output.Dy);
@@ -46,7 +59,7 @@ public sealed class RemappingEngineTests
         RemappedMouseDelta output = RemappingEngine.Remap(
             dx: 0,
             dy: 0,
-            profile: BuiltInRemappingProfiles.HorizontalInversion);
+            profile: HorizontalInversionProfile);
 
         Assert.Equal(0, output.Dx);
         Assert.Equal(0, output.Dy);

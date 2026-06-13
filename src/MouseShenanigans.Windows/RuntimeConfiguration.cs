@@ -8,12 +8,14 @@ public sealed record RuntimeConfiguration
         RuntimeTargetSelector targetSelector,
         string activeProfileName,
         bool cursorLockEnabled,
-        RemappingProfileSet profiles)
+        RemappingProfileSet profiles,
+        IReadOnlyList<RemappingProfile> configuredProfiles)
     {
         TargetSelector = targetSelector;
         ActiveProfileName = activeProfileName;
         CursorLockEnabled = cursorLockEnabled;
         Profiles = profiles;
+        ConfiguredProfiles = configuredProfiles.ToArray();
     }
 
     public RuntimeTargetSelector TargetSelector { get; }
@@ -23,6 +25,8 @@ public sealed record RuntimeConfiguration
     public bool CursorLockEnabled { get; }
 
     public RemappingProfileSet Profiles { get; }
+
+    public IReadOnlyList<RemappingProfile> ConfiguredProfiles { get; }
 
     public RemappingProfile ActiveProfile => Profiles.GetRequired(ActiveProfileName);
 
@@ -57,14 +61,11 @@ public sealed record RuntimeConfiguration
             throw new ArgumentException("Active profile name must not be empty.", nameof(activeProfileName));
         }
 
-        string normalizedActiveProfileName = activeProfileName.Trim();
-        RemappingProfileSet mergedProfiles = MergeBuiltInProfiles(profiles.Profiles);
-        mergedProfiles.GetRequired(normalizedActiveProfileName);
-        return new RuntimeConfiguration(
+        return CreateFromConfiguredProfiles(
             targetSelector,
-            normalizedActiveProfileName,
+            activeProfileName,
             cursorLockEnabled,
-            mergedProfiles);
+            profiles.Profiles);
     }
 
     public static RuntimeConfiguration CreateFromConfiguredProfiles(
@@ -73,20 +74,36 @@ public sealed record RuntimeConfiguration
         bool cursorLockEnabled,
         IEnumerable<RemappingProfile> configuredProfiles)
     {
+        ArgumentNullException.ThrowIfNull(targetSelector);
         ArgumentNullException.ThrowIfNull(configuredProfiles);
 
-        RemappingProfileSet profiles = MergeBuiltInProfiles(configuredProfiles);
-        return Create(targetSelector, activeProfileName, cursorLockEnabled, profiles);
+        if (string.IsNullOrWhiteSpace(activeProfileName))
+        {
+            throw new ArgumentException("Active profile name must not be empty.", nameof(activeProfileName));
+        }
+
+        RemappingProfile[] configuredProfileArray = configuredProfiles.ToArray();
+        ValidateConfiguredProfileNames(configuredProfileArray);
+
+        string normalizedActiveProfileName = activeProfileName.Trim();
+        RemappingProfileSet profiles = RemappingProfileSet.Create(configuredProfileArray);
+        profiles.GetRequired(normalizedActiveProfileName);
+        return new RuntimeConfiguration(
+            targetSelector,
+            normalizedActiveProfileName,
+            cursorLockEnabled,
+            profiles,
+            configuredProfileArray);
     }
 
     public RuntimeConfiguration WithActiveProfile(string activeProfileName)
     {
-        return Create(TargetSelector, activeProfileName, CursorLockEnabled, Profiles);
+        return CreateFromConfiguredProfiles(TargetSelector, activeProfileName, CursorLockEnabled, ConfiguredProfiles);
     }
 
     public RuntimeConfiguration WithTargetSelector(RuntimeTargetSelector targetSelector)
     {
-        return Create(targetSelector, ActiveProfileName, CursorLockEnabled, Profiles);
+        return CreateFromConfiguredProfiles(targetSelector, ActiveProfileName, CursorLockEnabled, ConfiguredProfiles);
     }
 
     public RuntimeRemappingOptions CreateRuntimeOptions()
@@ -97,19 +114,17 @@ public sealed record RuntimeConfiguration
             cursorLockEnabled: CursorLockEnabled);
     }
 
-    public static bool IsBuiltInProfileName(string profileName)
+    private static void ValidateConfiguredProfileNames(IEnumerable<RemappingProfile> configuredProfiles)
     {
-        return BuiltInRemappingProfiles.All.Any(
-            profile => string.Equals(profile.Name, profileName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static RemappingProfileSet MergeBuiltInProfiles(IEnumerable<RemappingProfile> configuredProfiles)
-    {
-        HashSet<string> builtInNames = BuiltInRemappingProfiles.All
-            .Select(profile => profile.Name)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        return RemappingProfileSet.Create(BuiltInRemappingProfiles.All.Concat(
-            configuredProfiles.Where(profile => !builtInNames.Contains(profile.Name))));
+        HashSet<string> names = new(StringComparer.OrdinalIgnoreCase);
+        foreach (RemappingProfile profile in configuredProfiles)
+        {
+            if (!names.Add(profile.Name))
+            {
+                throw new ArgumentException(
+                    $"Duplicate remapping profile name '{profile.Name}'.",
+                    nameof(configuredProfiles));
+            }
+        }
     }
 }

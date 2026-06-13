@@ -1,4 +1,3 @@
-using MouseShenanigans.Core;
 using MouseShenanigans.Windows;
 
 namespace MouseShenanigans.Tray;
@@ -22,7 +21,7 @@ public static class TrayStatusFormatter
         string? configurationStatus = null)
     {
         string target = configuration?.TargetDisplayName ?? RuntimeProofOfConceptDefaults.TargetProcessName;
-        string profile = configuration?.ActiveProfileName ?? BuiltInRemappingProfiles.HorizontalInversion.Name;
+        string profile = configuration?.ActiveProfileName ?? RuntimeProofOfConceptDefaults.ActiveProfileName;
         string stateText = status.State switch
         {
             RuntimeRemappingState.Enabled => $"Enabled for {target} using {profile}",

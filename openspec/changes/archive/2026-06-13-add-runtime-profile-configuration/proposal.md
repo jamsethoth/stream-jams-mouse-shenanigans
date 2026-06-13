@@ -1,12 +1,12 @@
 ## Why
 
-The runtime still hard-codes `Streamer.bot.exe` and the built-in horizontal inversion profile even though the core model already supports named JSON remapping profiles. The next useful app slice is to load target/profile configuration from disk and let the user switch active profiles at runtime without editing code or restarting the tray app.
+The runtime still hard-codes `Streamer.bot.exe` and one horizontal inversion profile even though the core model already supports named JSON remapping profiles. The next useful app slice is to load target/profile configuration from disk, remove pointless built-in pass-through profile modes, and let the user switch active remapping profiles at runtime without editing code or restarting the tray app.
 
 ## What Changes
 
 - Add a Windows tray runtime configuration file loaded from a deterministic per-user app data path.
 - Define a JSON configuration shape for target selection, active profile, cursor-lock default, and named remapping profiles.
-- Keep a built-in fallback configuration equivalent to today's proof of concept when no user config exists.
+- Keep a fallback configuration equivalent to today's proof of concept when no user config exists, with horizontal inversion stored as configured profile data rather than a built-in profile.
 - Allow the tray app to show available profiles and switch the active profile while the runtime is running.
 - Add a tray reload command for re-reading the profile configuration after the user edits JSON.
 - Persist active-profile selection when changed from the tray.
