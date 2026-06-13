@@ -29,4 +29,14 @@ public sealed class ScreenRectangleTests
         Assert.False(bounds.Contains(new ScreenPoint(9, 50)));
         Assert.False(bounds.Contains(new ScreenPoint(50, 19)));
     }
+
+    [Fact]
+    public void ClampReturnsNearestPointInsideExclusiveBounds()
+    {
+        var bounds = new ScreenRectangle(left: 10, top: 20, right: 110, bottom: 120);
+
+        Assert.Equal(new ScreenPoint(10, 119), bounds.Clamp(new ScreenPoint(0, 130)));
+        Assert.Equal(new ScreenPoint(109, 20), bounds.Clamp(new ScreenPoint(120, 10)));
+        Assert.Equal(new ScreenPoint(50, 60), bounds.Clamp(new ScreenPoint(50, 60)));
+    }
 }

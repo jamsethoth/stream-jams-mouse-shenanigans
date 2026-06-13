@@ -47,7 +47,7 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
     }
 
     [Fact]
-    public void HandleMovementKeepsCorrectionBoundedToRawInputMagnitudeWhenScreenMovementIsAccelerated()
+    public void HandleMovementInvertsObservedScreenMovementWhenScreenMovementIsAccelerated()
     {
         var source = new RecordingRawMouseMovementSource();
         var cursor = new RecordingCursorPositionController(new ScreenPoint(100, 50));
@@ -57,7 +57,97 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
         cursor.Position = new ScreenPoint(120, 50);
         source.Raise(new IntegerMouseDelta(5, 0));
 
-        Assert.Equal([new ScreenPoint(110, 50)], cursor.SetPositions);
+        Assert.Equal([new ScreenPoint(80, 50)], cursor.SetPositions);
+    }
+
+    [Fact]
+    public void HandleMovementCapsObservedScreenMovementWhenItExceedsRawInputLimit()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(100, 50));
+        using var coordinator = CreateCoordinator(source: source, cursor: cursor);
+        coordinator.Enable();
+
+        cursor.Position = new ScreenPoint(120, 50);
+        source.Raise(new IntegerMouseDelta(1, 0));
+
+        Assert.Equal([new ScreenPoint(92, 50)], cursor.SetPositions);
+    }
+
+    [Fact]
+    public void HandleMovementClampsTargetPositionToTargetBounds()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(190, 50));
+        using var coordinator = CreateCoordinator(source: source, cursor: cursor);
+        coordinator.Enable();
+
+        cursor.Position = new ScreenPoint(150, 50);
+        source.Raise(new IntegerMouseDelta(-10, 0));
+
+        Assert.Equal([new ScreenPoint(199, 50)], cursor.SetPositions);
+    }
+
+    [Fact]
+    public void HandleMovementUsesRawDeltaWhenCursorIsPinnedAtRightBoundary()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(199, 50));
+        using var coordinator = CreateCoordinator(
+            source: source,
+            targetWindowReader: new StubTargetWindowReader(TargetSnapshot(new ScreenPoint(199, 50))),
+            cursor: cursor);
+        coordinator.Enable();
+
+        source.Raise(new IntegerMouseDelta(5, 0));
+
+        Assert.Equal([new ScreenPoint(194, 50)], cursor.SetPositions);
+    }
+
+    [Fact]
+    public void HandleMovementUsesRawDeltaWhenCursorIsPinnedAtLeftBoundary()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(0, 50));
+        using var coordinator = CreateCoordinator(
+            source: source,
+            targetWindowReader: new StubTargetWindowReader(TargetSnapshot(new ScreenPoint(0, 50))),
+            cursor: cursor);
+        coordinator.Enable();
+
+        source.Raise(new IntegerMouseDelta(-5, 0));
+
+        Assert.Equal([new ScreenPoint(5, 50)], cursor.SetPositions);
+    }
+
+    [Fact]
+    public void HandleMovementPassesThroughWhenObservedMovementIsTooLargeForRawInput()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(20, 50));
+        using var coordinator = CreateCoordinator(source: source, cursor: cursor);
+        coordinator.Enable();
+
+        cursor.Position = new ScreenPoint(180, 50);
+        source.Raise(new IntegerMouseDelta(1, 0));
+
+        Assert.Empty(cursor.SetPositions);
+    }
+
+    [Fact]
+    public void HandleMovementPassesThroughStaleCursorAfterClampedTarget()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(190, 50));
+        using var coordinator = CreateCoordinator(source: source, cursor: cursor);
+        coordinator.Enable();
+
+        cursor.Position = new ScreenPoint(150, 50);
+        source.Raise(new IntegerMouseDelta(-10, 0));
+        cursor.Position = new ScreenPoint(20, 50);
+        source.Raise(new IntegerMouseDelta(-1, 0));
+
+        Assert.Equal([new ScreenPoint(199, 50)], cursor.SetPositions);
     }
 
     [Fact]
@@ -93,6 +183,27 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
     }
 
     [Fact]
+    public void HandleMovementClampsBackInsideTargetWhenCursorLockEnabledAndCursorEscapesBounds()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(250, 50));
+        var cursorLock = new RecordingCursorLockController();
+        using var coordinator = CreateCoordinator(
+            source: source,
+            targetWindowReader: new StubTargetWindowReader(TargetSnapshot(new ScreenPoint(250, 50))),
+            cursor: cursor,
+            cursorLock: cursorLock);
+        coordinator.SetCursorLockEnabled(true);
+        coordinator.Enable();
+
+        source.Raise(new IntegerMouseDelta(5, 0));
+
+        Assert.Equal([new ScreenPoint(199, 50)], cursor.SetPositions);
+        Assert.Equal([TargetBounds], cursorLock.LockedBounds);
+        Assert.Equal(0, cursorLock.ReleaseRequests);
+    }
+
+    [Fact]
     public void HandleMovementResumesRemappingAfterReentryGracePeriod()
     {
         var source = new RecordingRawMouseMovementSource();
@@ -111,9 +222,10 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
         cursor.Position = new ScreenPoint(105, 50);
         source.Raise(new IntegerMouseDelta(5, 0));
         clock.Advance(RuntimeRemappingOptions.DefaultTargetReentryGracePeriod);
+        cursor.Position = new ScreenPoint(110, 50);
         source.Raise(new IntegerMouseDelta(5, 0));
 
-        Assert.Equal([new ScreenPoint(95, 50)], cursor.SetPositions);
+        Assert.Equal([new ScreenPoint(100, 50)], cursor.SetPositions);
     }
 
     [Fact]
@@ -141,7 +253,28 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
     }
 
     [Fact]
-    public void ConstructorStartsWithCursorLockDisabledByDefault()
+    public void HandleMovementRemapsImmediatelyAfterReentryWhenCursorLockEnabled()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        var reader = new MutableTargetWindowReader(TargetSnapshot(new ScreenPoint(250, 50)));
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(250, 50));
+        using var coordinator = CreateCoordinator(
+            source: source,
+            targetWindowReader: reader,
+            cursor: cursor);
+        coordinator.SetCursorLockEnabled(true);
+        coordinator.Enable();
+
+        source.Raise(new IntegerMouseDelta(5, 0));
+        reader.Snapshot = TargetSnapshot(new ScreenPoint(170, 50));
+        cursor.Position = new ScreenPoint(170, 50);
+        source.Raise(new IntegerMouseDelta(-5, 0));
+
+        Assert.Equal([new ScreenPoint(199, 50), new ScreenPoint(199, 50)], cursor.SetPositions);
+    }
+
+    [Fact]
+    public void ConstructorUsesOptionsCursorLockSetting()
     {
         using var coordinator = CreateCoordinator();
 
@@ -164,7 +297,7 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
     }
 
     [Fact]
-    public void HandleMovementReleasesCursorLockWhenTargetIsLost()
+    public void HandleMovementRetainsCursorLockWhenTargetMatchIsTransientlyLost()
     {
         var source = new RecordingRawMouseMovementSource();
         var reader = new MutableTargetWindowReader(TargetSnapshot(new ScreenPoint(105, 50)));
@@ -177,7 +310,32 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
         reader.Snapshot = TargetWindowSnapshot.Empty;
         source.Raise(new IntegerMouseDelta(5, 0));
 
-        Assert.Equal(1, cursorLock.ReleaseRequests);
+        Assert.Equal(0, cursorLock.ReleaseRequests);
+        Assert.Equal([TargetBounds], cursorLock.LockedBounds);
+    }
+
+    [Fact]
+    public void HandleMovementClampsBackInsideActiveLockWhenTargetMatchIsTransientlyLost()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        var reader = new MutableTargetWindowReader(TargetSnapshot(new ScreenPoint(105, 50)));
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(105, 50));
+        var cursorLock = new RecordingCursorLockController();
+        using var coordinator = CreateCoordinator(
+            source: source,
+            targetWindowReader: reader,
+            cursor: cursor,
+            cursorLock: cursorLock);
+        coordinator.SetCursorLockEnabled(true);
+        coordinator.Enable();
+
+        source.Raise(new IntegerMouseDelta(5, 0));
+        reader.Snapshot = TargetWindowSnapshot.Empty;
+        cursor.Position = new ScreenPoint(250, 50);
+        source.Raise(new IntegerMouseDelta(5, 0));
+
+        Assert.Contains(new ScreenPoint(199, 50), cursor.SetPositions);
+        Assert.Equal(0, cursorLock.ReleaseRequests);
     }
 
     [Fact]
@@ -281,9 +439,38 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
                 up: new MovementVector(0, -1),
                 down: new MovementVector(0, 1))));
 
+        cursor.Position = new ScreenPoint(110, 50);
         source.Raise(new IntegerMouseDelta(5, 0));
 
-        Assert.Equal([new ScreenPoint(110, 50)], cursor.SetPositions);
+        Assert.Equal([new ScreenPoint(115, 50)], cursor.SetPositions);
+    }
+
+    [Fact]
+    public void ApplyOptionsWhileEnabledPreservesReentryGraceFromCurrentOutsideTargetState()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        var reader = new MutableTargetWindowReader(TargetSnapshot(new ScreenPoint(250, 50)));
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(250, 50));
+        var clock = new ManualRuntimeClock(new DateTimeOffset(2026, 6, 12, 12, 0, 0, TimeSpan.Zero));
+        using var coordinator = CreateCoordinator(
+            source: source,
+            targetWindowReader: reader,
+            cursor: cursor,
+            clock: clock);
+        coordinator.Enable();
+
+        coordinator.ApplyOptions(new RuntimeRemappingOptions(
+            RuntimeTargetSelector.ForProcessName("TargetApp"),
+            BuiltInRemappingProfiles.HorizontalInversion));
+        reader.Snapshot = TargetSnapshot(new ScreenPoint(105, 50));
+        cursor.Position = new ScreenPoint(105, 50);
+
+        source.Raise(new IntegerMouseDelta(5, 0));
+        clock.Advance(RuntimeRemappingOptions.DefaultTargetReentryGracePeriod);
+        cursor.Position = new ScreenPoint(110, 50);
+        source.Raise(new IntegerMouseDelta(5, 0));
+
+        Assert.Equal([new ScreenPoint(100, 50)], cursor.SetPositions);
     }
 
     private static AbsoluteCursorRemappingCoordinator CreateCoordinator(

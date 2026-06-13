@@ -27,18 +27,13 @@ public sealed class RuntimeConfigurationController
     public RuntimeConfigurationOperationResult SelectProfile(string profileName)
     {
         RuntimeConfiguration updatedConfiguration = Current.WithActiveProfile(profileName);
-        Current = updatedConfiguration;
-        try
-        {
-            store.Save(updatedConfiguration);
-            StatusMessage = null;
-            return new RuntimeConfigurationOperationResult(updatedConfiguration, Succeeded: true, Message: null);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            StatusMessage = $"Configuration save failed: {exception.Message}";
-            return new RuntimeConfigurationOperationResult(updatedConfiguration, Succeeded: false, StatusMessage);
-        }
+        return SaveCurrent(updatedConfiguration);
+    }
+
+    public RuntimeConfigurationOperationResult SelectTarget(RuntimeTargetSelector targetSelector)
+    {
+        RuntimeConfiguration updatedConfiguration = Current.WithTargetSelector(targetSelector);
+        return SaveCurrent(updatedConfiguration);
     }
 
     public RuntimeConfigurationOperationResult Reload()
@@ -54,6 +49,28 @@ public sealed class RuntimeConfigurationController
         {
             StatusMessage = $"Configuration reload failed: {exception.Message}";
             return new RuntimeConfigurationOperationResult(Current, Succeeded: false, StatusMessage);
+        }
+    }
+
+    public RuntimeConfigurationOperationResult ReportOperationFailure(string message)
+    {
+        StatusMessage = message;
+        return new RuntimeConfigurationOperationResult(Current, Succeeded: false, StatusMessage);
+    }
+
+    private RuntimeConfigurationOperationResult SaveCurrent(RuntimeConfiguration updatedConfiguration)
+    {
+        Current = updatedConfiguration;
+        try
+        {
+            store.Save(updatedConfiguration);
+            StatusMessage = null;
+            return new RuntimeConfigurationOperationResult(updatedConfiguration, Succeeded: true, Message: null);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            StatusMessage = $"Configuration save failed: {exception.Message}";
+            return new RuntimeConfigurationOperationResult(updatedConfiguration, Succeeded: false, StatusMessage);
         }
     }
 }

@@ -16,7 +16,7 @@ public static class RuntimeProofOfConceptDefaults
         return RuntimeConfiguration.Create(
             RuntimeTargetSelector.ForProcessName(TargetProcessName),
             BuiltInRemappingProfiles.HorizontalInversion.Name,
-            cursorLockEnabled: false,
+            cursorLockEnabled: true,
             RemappingProfileSet.Create([BuiltInRemappingProfiles.HorizontalInversion]));
     }
 }

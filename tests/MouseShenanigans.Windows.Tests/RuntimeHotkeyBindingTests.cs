@@ -6,7 +6,7 @@ namespace MouseShenanigans.Windows.Tests;
 public sealed class RuntimeHotkeyBindingTests
 {
     [Fact]
-    public void DefaultBindingsIncludeToggleAndEmergencyDisable()
+    public void DefaultBindingsIncludeToggleEmergencyDisableAndTargetCapture()
     {
         IReadOnlyList<HotkeyBinding> bindings = DefaultRuntimeHotkeyBindingProvider.Instance.GetBindings();
 
@@ -25,6 +25,12 @@ public sealed class RuntimeHotkeyBindingTests
                     HotkeyModifiers.Control | HotkeyModifiers.Alt | HotkeyModifiers.Shift | HotkeyModifiers.NoRepeat,
                     binding.Modifiers);
                 Assert.Equal(Keys.F8, binding.Key);
+            },
+            binding =>
+            {
+                Assert.Equal(RuntimeCommand.CaptureForegroundTarget, binding.Command);
+                Assert.Equal(HotkeyModifiers.Control | HotkeyModifiers.Alt | HotkeyModifiers.NoRepeat, binding.Modifiers);
+                Assert.Equal(Keys.F9, binding.Key);
             });
     }
 

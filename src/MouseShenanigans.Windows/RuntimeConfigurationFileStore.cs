@@ -21,7 +21,10 @@ public sealed class RuntimeConfigurationFileStore : IRuntimeConfigurationStore
 
         if (!File.Exists(ConfigurationPath))
         {
-            return new RuntimeConfigurationLoadResult(fallbackConfiguration, UsedFallback: true, ErrorMessage: null);
+            return new RuntimeConfigurationLoadResult(
+                fallbackConfiguration,
+                UsedFallback: true,
+                ErrorMessage: TryCreateDefaultConfiguration(fallbackConfiguration));
         }
 
         try
@@ -62,5 +65,18 @@ public sealed class RuntimeConfigurationFileStore : IRuntimeConfigurationStore
             ConfigurationPath,
             RuntimeConfigurationJsonSerializer.Serialize(configuration),
             Utf8NoBom);
+    }
+
+    private string? TryCreateDefaultConfiguration(RuntimeConfiguration configuration)
+    {
+        try
+        {
+            Save(configuration);
+            return null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return $"Default runtime configuration could not be created: {exception.Message}";
+        }
     }
 }

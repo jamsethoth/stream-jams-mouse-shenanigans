@@ -11,10 +11,10 @@ public sealed class AbsoluteCursorRemappingDecisionEngineTests
         var engine = new AbsoluteCursorRemappingDecisionEngine(BuiltInRemappingProfiles.HorizontalInversion);
 
         AbsoluteCursorRemappingDecision decision = engine.Decide(
-            new RuntimeMouseMovement(dx: 5, dy: 0, isInjected: false),
+            new RuntimeMouseMovement(dx: 5, dy: 0),
             isEnabled: true,
             targetMatches: true,
-            currentPosition: new ScreenPoint(105, 50));
+            anchorPosition: new ScreenPoint(100, 50));
 
         Assert.Equal(new ScreenPoint(95, 50), decision.TargetPosition);
     }
@@ -28,10 +28,10 @@ public sealed class AbsoluteCursorRemappingDecisionEngineTests
             absoluteCorrectionScale: 0.5);
 
         AbsoluteCursorRemappingDecision decision = engine.Decide(
-            new RuntimeMouseMovement(dx: 5, dy: 0, isInjected: false),
+            new RuntimeMouseMovement(dx: 5, dy: 0),
             isEnabled: true,
             targetMatches: true,
-            currentPosition: new ScreenPoint(105, 50));
+            anchorPosition: new ScreenPoint(100, 50));
 
         Assert.Equal(new ScreenPoint(100, 50), decision.TargetPosition);
     }
@@ -42,10 +42,10 @@ public sealed class AbsoluteCursorRemappingDecisionEngineTests
         var engine = new AbsoluteCursorRemappingDecisionEngine(BuiltInRemappingProfiles.HorizontalInversion);
 
         AbsoluteCursorRemappingDecision decision = engine.Decide(
-            new RuntimeMouseMovement(dx: 0, dy: 5, isInjected: false),
+            new RuntimeMouseMovement(dx: 0, dy: 5),
             isEnabled: true,
             targetMatches: true,
-            currentPosition: new ScreenPoint(100, 105));
+            anchorPosition: new ScreenPoint(100, 100));
 
         Assert.Null(decision.TargetPosition);
     }
@@ -62,10 +62,10 @@ public sealed class AbsoluteCursorRemappingDecisionEngineTests
         var engine = new AbsoluteCursorRemappingDecisionEngine(zeroRightMovementProfile);
 
         AbsoluteCursorRemappingDecision decision = engine.Decide(
-            new RuntimeMouseMovement(dx: 5, dy: 0, isInjected: false),
+            new RuntimeMouseMovement(dx: 5, dy: 0),
             isEnabled: true,
             targetMatches: true,
-            currentPosition: new ScreenPoint(105, 50));
+            anchorPosition: new ScreenPoint(100, 50));
 
         Assert.Equal(new ScreenPoint(100, 50), decision.TargetPosition);
     }
@@ -76,15 +76,15 @@ public sealed class AbsoluteCursorRemappingDecisionEngineTests
         var engine = new AbsoluteCursorRemappingDecisionEngine(BuiltInRemappingProfiles.HorizontalInversion);
 
         Assert.Null(engine.Decide(
-            new RuntimeMouseMovement(dx: 5, dy: 0, isInjected: false),
+            new RuntimeMouseMovement(dx: 5, dy: 0),
             isEnabled: false,
             targetMatches: true,
-            currentPosition: new ScreenPoint(105, 50)).TargetPosition);
+            anchorPosition: new ScreenPoint(100, 50)).TargetPosition);
 
         Assert.Null(engine.Decide(
-            new RuntimeMouseMovement(dx: 5, dy: 0, isInjected: false),
+            new RuntimeMouseMovement(dx: 5, dy: 0),
             isEnabled: true,
             targetMatches: false,
-            currentPosition: new ScreenPoint(105, 50)).TargetPosition);
+            anchorPosition: new ScreenPoint(100, 50)).TargetPosition);
     }
 }

@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Define the Windows-only global hotkey behavior for toggling runtime remapping and emergency-disabling the runtime while the tray app is running.
+Define the Windows-only global hotkey behavior for toggling runtime remapping, emergency-disabling the runtime, and capturing the current foreground window as the runtime target while the tray app is running.
 
 ## Requirements
 
 ### Requirement: Global runtime hotkeys
-The system SHALL register Windows-only global hotkeys for toggling runtime remapping and emergency-disabling runtime remapping while the tray app is running in a supported desktop session.
+The system SHALL register Windows-only global hotkeys for toggling runtime remapping, emergency-disabling runtime remapping, and capturing the current foreground window as the runtime target while the tray app is running in a supported desktop session.
 
 #### Scenario: Toggle hotkey enables disabled runtime
 - **GIVEN** the tray app is running in a supported Windows desktop session
@@ -39,13 +39,20 @@ The system SHALL register Windows-only global hotkeys for toggling runtime remap
 - **THEN** the runtime remains disabled
 - **AND** tray-visible runtime status remains coherent
 
+#### Scenario: Target capture hotkey changes runtime target
+- **GIVEN** the tray app is running in a supported Windows desktop session
+- **AND** a third-party window is the current foreground window
+- **WHEN** the user presses the default target-capture hotkey
+- **THEN** the runtime target is updated to the foreground window identity
+- **AND** tray-visible runtime status is refreshed
+
 ### Requirement: Hotkey registration lifecycle
 The system SHALL register default runtime hotkeys at tray startup and SHALL unregister any registered hotkeys when the tray app exits.
 
 #### Scenario: Hotkeys register at startup
 - **GIVEN** the tray app starts in a supported Windows desktop session
 - **WHEN** default hotkey registration succeeds
-- **THEN** the toggle and emergency-disable hotkeys are available until tray exit
+- **THEN** the toggle, emergency-disable, and target-capture hotkeys are available until tray exit
 
 #### Scenario: Hotkey registration partially fails
 - **GIVEN** the tray app starts in a supported Windows desktop session
@@ -72,4 +79,5 @@ The system SHALL keep real global hotkey delivery verification manual while cove
 - **WHEN** manual Windows verification is performed
 - **THEN** verification covers pressing the toggle hotkey while the target app has focus
 - **AND** pressing the emergency-disable hotkey while remapping and cursor lock are active
+- **AND** pressing the target-capture hotkey while a third-party app has focus
 - **AND** exiting the tray after hotkeys have been registered

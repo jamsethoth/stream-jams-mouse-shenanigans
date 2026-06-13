@@ -37,9 +37,9 @@ public sealed class AbsoluteCursorRemappingDecisionEngine
         RuntimeMouseMovement movement,
         bool isEnabled,
         bool targetMatches,
-        ScreenPoint currentPosition)
+        ScreenPoint anchorPosition)
     {
-        if (!isEnabled || !targetMatches || movement.IsInjected)
+        if (!isEnabled || !targetMatches)
         {
             return AbsoluteCursorRemappingDecision.PassThrough;
         }
@@ -49,6 +49,7 @@ public sealed class AbsoluteCursorRemappingDecisionEngine
             (remapped.Dx - movement.Dx) * absoluteCorrectionScale,
             (remapped.Dy - movement.Dy) * absoluteCorrectionScale);
         IntegerMouseDelta integerCorrection = accumulator.Convert(correction);
+        ScreenPoint currentPosition = anchorPosition.Offset(new IntegerMouseDelta(movement.Dx, movement.Dy));
 
         return AbsoluteCursorRemappingDecision.MoveByCorrection(currentPosition, integerCorrection);
     }

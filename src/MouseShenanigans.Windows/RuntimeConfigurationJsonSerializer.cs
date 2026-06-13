@@ -38,21 +38,15 @@ public static class RuntimeConfigurationJsonSerializer
                 throw new InvalidDataException("Runtime configuration must include cursorLockEnabled.");
             }
 
-            if (document.Profiles is not { Count: > 0 })
-            {
-                throw new InvalidDataException("Runtime configuration must contain at least one profile.");
-            }
-
-            RemappingProfileSet profiles = RemappingProfileSet.Create(document.Profiles.Select(ToProfile));
             RuntimeTargetSelector targetSelector = RuntimeTargetSelector.Create(
                 document.Target.ProcessName,
                 document.Target.WindowTitleContains);
 
-            return RuntimeConfiguration.Create(
+            return RuntimeConfiguration.CreateFromConfiguredProfiles(
                 targetSelector,
                 document.ActiveProfile ?? string.Empty,
                 document.CursorLockEnabled.Value,
-                profiles);
+                document.Profiles?.Select(ToProfile) ?? []);
         }
         catch (JsonException exception)
         {
@@ -81,7 +75,10 @@ public static class RuntimeConfigurationJsonSerializer
             },
             ActiveProfile = configuration.ActiveProfileName,
             CursorLockEnabled = configuration.CursorLockEnabled,
-            Profiles = configuration.Profiles.Profiles.Select(ToDto).ToArray(),
+            Profiles = configuration.Profiles.Profiles
+                .Where(profile => !RuntimeConfiguration.IsBuiltInProfileName(profile.Name))
+                .Select(ToDto)
+                .ToArray(),
         };
 
         return JsonSerializer.Serialize(document, JsonOptions);

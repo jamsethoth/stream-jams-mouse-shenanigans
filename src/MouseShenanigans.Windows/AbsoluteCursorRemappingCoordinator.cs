@@ -2,6 +2,8 @@ namespace MouseShenanigans.Windows;
 
 public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingController
 {
+    private const int BoundaryFallbackTolerancePixels = 1;
+
     private readonly IRawMouseMovementSource movementSource;
     private readonly ITargetWindowReader targetWindowReader;
     private readonly ICursorPositionController cursorPositionController;
@@ -13,6 +15,8 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
     private bool disposed;
     private bool isCursorLockEnabled;
     private ScreenRectangle? activeCursorLockBounds;
+    private ScreenPoint? lastAcceptedCursorPosition;
+    private ScreenRectangle? lastAcceptedTargetBounds;
 
     public AbsoluteCursorRemappingCoordinator(
         RuntimeRemappingOptions options,
@@ -99,6 +103,12 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
     {
         ObjectDisposedException.ThrowIf(disposed, this);
 
+        if (isCursorLockEnabled != enabled)
+        {
+            ResetAcceptedCursorPosition();
+            targetReentryGate.Reset();
+        }
+
         isCursorLockEnabled = enabled;
         if (!enabled)
         {
@@ -117,8 +127,37 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
             options.ActiveProfile,
             options.AbsoluteCorrectionScale);
         decisionEngine.ResetAccumulator();
+        ResetAcceptedCursorPosition();
+        ResetTargetStateAfterOptionsChanged();
+    }
+
+    private void ResetTargetStateAfterOptionsChanged()
+    {
+        bool wasEnabled = Status.State == RuntimeRemappingState.Enabled;
         targetReentryGate.Reset();
         TryReleaseCursorLock();
+
+        if (!wasEnabled)
+        {
+            return;
+        }
+
+        try
+        {
+            TargetWindowSnapshot targetSnapshot = targetWindowReader.ReadSnapshot();
+            RuntimeTargetEligibility eligibility = options.TargetSelector.Evaluate(targetSnapshot);
+            RuntimeTargetReadiness readiness = EvaluateReadiness(eligibility);
+            UpdateCursorLock(readiness.Eligibility);
+            SeedAcceptedCursorPosition(readiness.Eligibility.TargetBounds);
+        }
+        catch (Exception ex)
+        {
+            TryStopSource();
+            TryReleaseCursorLock();
+            targetReentryGate.Reset();
+            ResetAcceptedCursorPosition();
+            Status = RuntimeRemappingStatus.Failed(ex.Message);
+        }
     }
 
     public void Enable()
@@ -140,6 +179,8 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
         try
         {
             targetReentryGate.Reset();
+            ResetAcceptedCursorPosition();
+            SeedAcceptedCursorPosition(targetBounds: null);
             movementSource.Start(HandleMovement);
             Status = RuntimeRemappingStatus.Enabled;
         }
@@ -148,6 +189,7 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
             TryStopSource();
             TryReleaseCursorLock();
             targetReentryGate.Reset();
+            ResetAcceptedCursorPosition();
             Status = RuntimeRemappingStatus.Failed(ex.Message);
         }
     }
@@ -172,6 +214,7 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
         {
             decisionEngine.ResetAccumulator();
             targetReentryGate.Reset();
+            ResetAcceptedCursorPosition();
             Status = RuntimeRemappingStatus.Disabled;
         }
     }
@@ -186,6 +229,7 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
         TryReleaseCursorLock();
         TryStopSource();
         targetReentryGate.Reset();
+        ResetAcceptedCursorPosition();
         movementSource.Dispose();
         disposed = true;
     }
@@ -201,19 +245,71 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
         {
             TargetWindowSnapshot targetSnapshot = targetWindowReader.ReadSnapshot();
             RuntimeTargetEligibility eligibility = options.TargetSelector.Evaluate(targetSnapshot);
-            RuntimeTargetReadiness readiness = targetReentryGate.Evaluate(eligibility);
-            UpdateCursorLock(readiness.Eligibility);
+            RuntimeTargetReadiness readiness = EvaluateReadiness(eligibility);
 
             ScreenPoint currentPosition = cursorPositionController.GetPosition();
-            AbsoluteCursorRemappingDecision decision = decisionEngine.Decide(
-                new RuntimeMouseMovement(rawMovement.Dx, rawMovement.Dy, isInjected: false),
-                isEnabled: true,
-                readiness.IsEligibleForRemapping,
-                currentPosition);
-
-            if (decision.TargetPosition is { } targetPosition)
+            bool retainedCursorLockAfterNoMatch = ShouldRetainCursorLockAfterNoMatch(readiness.Eligibility);
+            if (!retainedCursorLockAfterNoMatch)
             {
-                cursorPositionController.SetPosition(targetPosition);
+                UpdateCursorLock(readiness.Eligibility);
+            }
+
+            ScreenRectangle? targetBounds = readiness.Eligibility.TargetBounds
+                ?? (retainedCursorLockAfterNoMatch ? activeCursorLockBounds : null);
+            bool isOutsideTargetBounds = targetBounds is { } bounds
+                && !bounds.Contains(currentPosition);
+
+            if (isCursorLockEnabled
+                && isOutsideTargetBounds
+                && targetBounds is { } escapeBounds)
+            {
+                ScreenPoint targetPosition = escapeBounds.Clamp(currentPosition);
+                if (targetPosition != currentPosition)
+                {
+                    cursorPositionController.SetPosition(targetPosition);
+                }
+
+                AcceptCursorPosition(targetPosition, targetBounds);
+            }
+            else if (!readiness.IsEligibleForRemapping)
+            {
+                AcceptCursorPosition(currentPosition, targetBounds);
+            }
+            else
+            {
+                ScreenPoint anchor = GetAnchorPosition(currentPosition, targetBounds);
+                var observedMovement = new RuntimeMouseMovement(
+                    currentPosition.X - anchor.X,
+                    currentPosition.Y - anchor.Y);
+                RuntimeMouseMovement effectiveMovement = CreateBoundaryAwareMovement(
+                    rawMovement,
+                    observedMovement,
+                    currentPosition,
+                    targetBounds);
+
+                if (TryCreateBoundedMovement(rawMovement, effectiveMovement, out RuntimeMouseMovement boundedMovement))
+                {
+                    AbsoluteCursorRemappingDecision decision = decisionEngine.Decide(
+                        boundedMovement,
+                        isEnabled: true,
+                        targetMatches: true,
+                        anchor);
+                    ScreenPoint? targetPosition = ClampToTargetBounds(decision.TargetPosition, targetBounds);
+
+                    if (targetPosition is { } target)
+                    {
+                        cursorPositionController.SetPosition(target);
+                        AcceptCursorPosition(target, targetBounds);
+                    }
+                    else
+                    {
+                        AcceptCursorPosition(currentPosition, targetBounds);
+                    }
+                }
+                else
+                {
+                    AcceptCursorPosition(currentPosition, targetBounds);
+                }
             }
         }
         catch (Exception ex)
@@ -221,8 +317,170 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
             TryStopSource();
             TryReleaseCursorLock();
             targetReentryGate.Reset();
+            ResetAcceptedCursorPosition();
             Status = RuntimeRemappingStatus.Failed(ex.Message);
         }
+    }
+
+    private void ResetAcceptedCursorPosition()
+    {
+        lastAcceptedCursorPosition = null;
+        lastAcceptedTargetBounds = null;
+    }
+
+    private void SeedAcceptedCursorPosition(ScreenRectangle? targetBounds)
+    {
+        AcceptCursorPosition(cursorPositionController.GetPosition(), targetBounds);
+    }
+
+    private ScreenPoint GetAnchorPosition(ScreenPoint currentPosition, ScreenRectangle? targetBounds)
+    {
+        if (lastAcceptedCursorPosition is not { } anchorPosition)
+        {
+            AcceptCursorPosition(currentPosition, targetBounds);
+            return currentPosition;
+        }
+
+        if (lastAcceptedTargetBounds is { } previousTargetBounds
+            && previousTargetBounds != targetBounds)
+        {
+            AcceptCursorPosition(currentPosition, targetBounds);
+            return currentPosition;
+        }
+
+        lastAcceptedTargetBounds = targetBounds;
+        return anchorPosition;
+    }
+
+    private RuntimeTargetReadiness EvaluateReadiness(RuntimeTargetEligibility eligibility)
+    {
+        if (isCursorLockEnabled)
+        {
+            return new RuntimeTargetReadiness(eligibility, eligibility.IsEligibleForRemapping);
+        }
+
+        return targetReentryGate.Evaluate(eligibility);
+    }
+
+    private bool ShouldRetainCursorLockAfterNoMatch(RuntimeTargetEligibility eligibility)
+    {
+        return isCursorLockEnabled
+            && activeCursorLockBounds is not null
+            && eligibility.State == RuntimeTargetEligibilityState.NoMatch;
+    }
+
+    private void AcceptCursorPosition(ScreenPoint position, ScreenRectangle? targetBounds)
+    {
+        lastAcceptedCursorPosition = position;
+        lastAcceptedTargetBounds = targetBounds;
+    }
+
+    private static ScreenPoint? ClampToTargetBounds(ScreenPoint? targetPosition, ScreenRectangle? targetBounds)
+    {
+        if (targetPosition is not { } position)
+        {
+            return null;
+        }
+
+        return targetBounds?.Clamp(position) ?? position;
+    }
+
+    private static bool TryCreateBoundedMovement(
+        IntegerMouseDelta rawMovement,
+        RuntimeMouseMovement movement,
+        out RuntimeMouseMovement boundedMovement)
+    {
+        boundedMovement = new RuntimeMouseMovement(0, 0);
+
+        if (IsObservedMovementStale(rawMovement, movement))
+        {
+            return false;
+        }
+
+        boundedMovement = new RuntimeMouseMovement(
+            ClampDelta(movement.Dx, CreateObservedMovementLimit(rawMovement.Dx)),
+            ClampDelta(movement.Dy, CreateObservedMovementLimit(rawMovement.Dy)));
+        return true;
+    }
+
+    private static RuntimeMouseMovement CreateBoundaryAwareMovement(
+        IntegerMouseDelta rawMovement,
+        RuntimeMouseMovement observedMovement,
+        ScreenPoint currentPosition,
+        ScreenRectangle? targetBounds)
+    {
+        if (targetBounds is not { } bounds)
+        {
+            return observedMovement;
+        }
+
+        int dx = observedMovement.Dx;
+        int dy = observedMovement.Dy;
+
+        if ((IsNearLeftBoundary(currentPosition, bounds) && rawMovement.Dx < 0)
+            || (IsNearRightBoundary(currentPosition, bounds) && rawMovement.Dx > 0))
+        {
+            dx = rawMovement.Dx;
+        }
+
+        if ((IsNearTopBoundary(currentPosition, bounds) && rawMovement.Dy < 0)
+            || (IsNearBottomBoundary(currentPosition, bounds) && rawMovement.Dy > 0))
+        {
+            dy = rawMovement.Dy;
+        }
+
+        return new RuntimeMouseMovement(dx, dy);
+    }
+
+    private static bool IsNearLeftBoundary(ScreenPoint position, ScreenRectangle bounds)
+    {
+        return position.X <= bounds.Left + BoundaryFallbackTolerancePixels;
+    }
+
+    private static bool IsNearRightBoundary(ScreenPoint position, ScreenRectangle bounds)
+    {
+        return position.X >= GetMaxX(bounds) - BoundaryFallbackTolerancePixels;
+    }
+
+    private static bool IsNearTopBoundary(ScreenPoint position, ScreenRectangle bounds)
+    {
+        return position.Y <= bounds.Top + BoundaryFallbackTolerancePixels;
+    }
+
+    private static bool IsNearBottomBoundary(ScreenPoint position, ScreenRectangle bounds)
+    {
+        return position.Y >= GetMaxY(bounds) - BoundaryFallbackTolerancePixels;
+    }
+
+    private static int GetMaxX(ScreenRectangle bounds)
+    {
+        return bounds.Right > bounds.Left ? bounds.Right - 1 : bounds.Left;
+    }
+
+    private static int GetMaxY(ScreenRectangle bounds)
+    {
+        return bounds.Bottom > bounds.Top ? bounds.Bottom - 1 : bounds.Top;
+    }
+
+    private static int CreateObservedMovementLimit(int rawDelta)
+    {
+        return Math.Max(Math.Abs(rawDelta) * 4, 8);
+    }
+
+    private static bool IsObservedMovementStale(IntegerMouseDelta rawMovement, RuntimeMouseMovement observedMovement)
+    {
+        return Math.Abs(observedMovement.Dx) > CreateStaleObservedMovementLimit(rawMovement.Dx)
+            || Math.Abs(observedMovement.Dy) > CreateStaleObservedMovementLimit(rawMovement.Dy);
+    }
+
+    private static int CreateStaleObservedMovementLimit(int rawDelta)
+    {
+        return Math.Max(Math.Abs(rawDelta) * 16, 64);
+    }
+
+    private static int ClampDelta(int delta, int absoluteLimit)
+    {
+        return Math.Clamp(delta, -absoluteLimit, absoluteLimit);
     }
 
     private void UpdateCursorLock(RuntimeTargetEligibility eligibility)
@@ -283,4 +541,5 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
             return false;
         }
     }
+
 }

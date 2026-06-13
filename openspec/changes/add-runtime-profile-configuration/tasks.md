@@ -46,3 +46,11 @@
 - [ ] 6.5 Edit config to a valid new target/profile set, reload from tray, and verify the new configuration applies without process restart.
 - [ ] 6.6 Edit config to invalid JSON, reload from tray, and verify the last known good configuration remains active with an error status.
 - [ ] 6.7 Record any file permission, path, reload, or profile-switching limitation found during manual testing.
+
+## 7. Focused Target Capture Hotkey
+
+- [x] 7.1 Add a runtime command that captures the foreground window as the current target.
+- [x] 7.2 Persist captured targets through the runtime configuration controller.
+- [x] 7.3 Register a default target-capture hotkey.
+- [x] 7.4 Add automated tests for process capture, title fallback, capture failure, and default binding coverage.
+- [ ] 7.5 Manually verify pressing the target-capture hotkey changes the active target and persists it after restart.

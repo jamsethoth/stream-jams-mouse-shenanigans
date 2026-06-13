@@ -38,6 +38,36 @@ public sealed class RuntimeConfigurationControllerTests
     }
 
     [Fact]
+    public void SelectTargetPersistsTargetSelection()
+    {
+        RuntimeConfiguration configuration = CreateConfiguration();
+        var store = new RecordingConfigurationStore(configuration);
+        var controller = new RuntimeConfigurationController(store, RuntimeProofOfConceptDefaults.CreateConfiguration());
+
+        RuntimeConfigurationOperationResult result = controller.SelectTarget(RuntimeTargetSelector.ForProcessName("notepad"));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("notepad", controller.Current.TargetSelector.ProcessName);
+        Assert.Single(store.SavedConfigurations);
+        Assert.Equal("notepad", store.SavedConfigurations[0].TargetSelector.ProcessName);
+    }
+
+    [Fact]
+    public void ReportOperationFailurePreservesCurrentConfiguration()
+    {
+        RuntimeConfiguration configuration = CreateConfiguration();
+        var store = new RecordingConfigurationStore(configuration);
+        var controller = new RuntimeConfigurationController(store, RuntimeProofOfConceptDefaults.CreateConfiguration());
+
+        RuntimeConfigurationOperationResult result = controller.ReportOperationFailure("Target capture failed.");
+
+        Assert.False(result.Succeeded);
+        Assert.Same(configuration, controller.Current);
+        Assert.Equal("Target capture failed.", controller.StatusMessage);
+        Assert.Empty(store.SavedConfigurations);
+    }
+
+    [Fact]
     public void ReloadSuccessReplacesCurrentConfiguration()
     {
         RuntimeConfiguration initial = CreateConfiguration();

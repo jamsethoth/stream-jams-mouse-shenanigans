@@ -50,4 +50,5 @@ public sealed class RuntimeRemappingOptionsTests
             BuiltInRemappingProfiles.HorizontalInversion,
             absoluteCorrectionScale));
     }
+
 }

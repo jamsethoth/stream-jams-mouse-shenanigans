@@ -58,13 +58,35 @@ public sealed record RuntimeConfiguration
         }
 
         string normalizedActiveProfileName = activeProfileName.Trim();
-        profiles.GetRequired(normalizedActiveProfileName);
-        return new RuntimeConfiguration(targetSelector, normalizedActiveProfileName, cursorLockEnabled, profiles);
+        RemappingProfileSet mergedProfiles = MergeBuiltInProfiles(profiles.Profiles);
+        mergedProfiles.GetRequired(normalizedActiveProfileName);
+        return new RuntimeConfiguration(
+            targetSelector,
+            normalizedActiveProfileName,
+            cursorLockEnabled,
+            mergedProfiles);
+    }
+
+    public static RuntimeConfiguration CreateFromConfiguredProfiles(
+        RuntimeTargetSelector targetSelector,
+        string activeProfileName,
+        bool cursorLockEnabled,
+        IEnumerable<RemappingProfile> configuredProfiles)
+    {
+        ArgumentNullException.ThrowIfNull(configuredProfiles);
+
+        RemappingProfileSet profiles = MergeBuiltInProfiles(configuredProfiles);
+        return Create(targetSelector, activeProfileName, cursorLockEnabled, profiles);
     }
 
     public RuntimeConfiguration WithActiveProfile(string activeProfileName)
     {
         return Create(TargetSelector, activeProfileName, CursorLockEnabled, Profiles);
+    }
+
+    public RuntimeConfiguration WithTargetSelector(RuntimeTargetSelector targetSelector)
+    {
+        return Create(targetSelector, ActiveProfileName, CursorLockEnabled, Profiles);
     }
 
     public RuntimeRemappingOptions CreateRuntimeOptions()
@@ -73,5 +95,21 @@ public sealed record RuntimeConfiguration
             TargetSelector,
             ActiveProfile,
             cursorLockEnabled: CursorLockEnabled);
+    }
+
+    public static bool IsBuiltInProfileName(string profileName)
+    {
+        return BuiltInRemappingProfiles.All.Any(
+            profile => string.Equals(profile.Name, profileName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static RemappingProfileSet MergeBuiltInProfiles(IEnumerable<RemappingProfile> configuredProfiles)
+    {
+        HashSet<string> builtInNames = BuiltInRemappingProfiles.All
+            .Select(profile => profile.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return RemappingProfileSet.Create(BuiltInRemappingProfiles.All.Concat(
+            configuredProfiles.Where(profile => !builtInNames.Contains(profile.Name))));
     }
 }

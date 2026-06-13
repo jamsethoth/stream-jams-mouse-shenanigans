@@ -26,7 +26,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         runtimeConfigurationController = CreateRuntimeConfigurationController();
         runtime = CreateRuntime(runtimeConfigurationController.Current.CreateRuntimeOptions());
-        runtimeCommandController = new RuntimeCommandController(runtime, runtimeConfigurationController);
+        runtimeCommandController = new RuntimeCommandController(
+            runtime,
+            runtimeConfigurationController,
+            new TargetWindowReader());
         statusItem = new ToolStripMenuItem { Enabled = false };
         hotkeyStatusItem = new ToolStripMenuItem { Enabled = false };
         enableItem = new ToolStripMenuItem("Enable remapping");
@@ -55,7 +58,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
         };
         cursorLockItem.Click += (_, _) => cursorLockController.SetCursorLockEnabled(cursorLockItem.Checked);
         reloadConfigurationItem.Click += (_, _) => profileMenuController.ReloadConfiguration();
-        shutdownController = new TrayShutdownController(runtime, HideNotifyIcon, ExitThread);
+        shutdownController = new TrayShutdownController(
+            runtime,
+            HideNotifyIcon,
+            DisposeExitResources,
+            ExitThread);
         hotkeyController = new TrayHotkeyController(
             new WindowsHotkeyRegistrar(),
             runtimeCommandController,
@@ -143,13 +150,22 @@ internal sealed class TrayApplicationContext : ApplicationContext
         notifyIcon.Visible = false;
     }
 
+    private void DisposeExitResources()
+    {
+        hotkeyController.Dispose();
+        hotkeyReceiver.Dispose();
+    }
+
     private static AbsoluteCursorRemappingCoordinator CreateRuntime(RuntimeRemappingOptions options)
     {
         return new AbsoluteCursorRemappingCoordinator(
             options,
             new RawInputMouseMovementSource(),
             new TargetWindowReader(),
-            new WindowsCursorPositionController());
+            new WindowsCursorPositionController(),
+            new WindowsCursorLockController(),
+            SystemRuntimeClock.Instance,
+            WindowsRuntime.IsDesktopInputAvailable);
     }
 
     private static RuntimeConfigurationController CreateRuntimeConfigurationController()

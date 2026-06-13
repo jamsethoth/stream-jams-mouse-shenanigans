@@ -128,17 +128,7 @@ The system SHALL apply the active core remapping profile to targeted observed mo
 - **AND** the core remapping profile remains unchanged
 
 ### Requirement: Cursor output feedback guard
-The system SHALL avoid remapping movement that was written by the app as part of runtime correction.
-
-#### Scenario: Own corrected movement is observed by a relative-input boundary
-- **GIVEN** the runtime writes replacement movement through a relative-input boundary
-- **WHEN** the low-level hook observes that injected movement
-- **THEN** the movement is passed through without applying the active remapping profile again
-
-#### Scenario: Injected movement flag is present
-- **GIVEN** the runtime is enabled
-- **WHEN** a low-level mouse event is marked as injected by Windows
-- **THEN** the runtime does not treat that event as ordinary physical movement for remapping
+The system SHALL avoid remapping absolute cursor writes produced by the app as ordinary physical movement.
 
 #### Scenario: Absolute cursor write is observed by Raw Input
 - **GIVEN** the runtime writes a corrected absolute cursor position
@@ -146,18 +136,18 @@ The system SHALL avoid remapping movement that was written by the app as part of
 - **THEN** absolute mouse movement is not treated as ordinary relative physical movement for remapping
 
 #### Scenario: Later physical movement is observed
-- **GIVEN** the runtime has passed through an injected movement event
-- **WHEN** later ordinary physical movement is observed for a matching target
+- **GIVEN** the runtime has written a corrected absolute cursor position
+- **WHEN** later ordinary relative physical movement is observed for a matching target
 - **THEN** the later physical movement remains eligible for remapping
 
 ### Requirement: Optional target-window cursor lock
-The system SHALL provide an opt-in cursor lock mode that constrains the cursor to the active target window bounds while the runtime is enabled, the configured target matches, and target bounds are available.
+The system SHALL provide a cursor lock mode that constrains the cursor to the active target window bounds while the runtime is enabled, the configured target matches, and target bounds are available.
 
-#### Scenario: Cursor lock starts disabled
+#### Scenario: Cursor lock starts enabled by default
 - **GIVEN** the tray host constructs the runtime with default proof-of-concept options
 - **WHEN** the runtime status is inspected
-- **THEN** cursor lock is disabled
-- **AND** the cursor is not constrained to a target window by default
+- **THEN** cursor lock is enabled
+- **AND** the cursor will be constrained after a target match is acquired while remapping is enabled
 
 #### Scenario: Cursor lock constrains active target
 - **GIVEN** the runtime is enabled
@@ -190,7 +180,7 @@ The system SHALL provide an opt-in cursor lock mode that constrains the cursor t
 - **THEN** the runtime releases the cursor constraint
 
 ### Requirement: Proof-of-concept tray control
-The tray app SHALL expose only the minimal controls and status needed to run the runtime proof of concept manually, including an opt-in cursor-lock toggle for target-boundary validation.
+The tray app SHALL expose only the minimal controls and status needed to run the runtime proof of concept manually, including a cursor-lock toggle for target-boundary validation.
 
 #### Scenario: Tray enables runtime
 - **GIVEN** the tray app is running on Windows
@@ -261,7 +251,7 @@ The system SHALL keep automated coverage focused on pure runtime decisions and S
 #### Scenario: Pure runtime decisions are tested
 - **GIVEN** automated tests run in CI
 - **WHEN** the runtime proof-of-concept tests execute
-- **THEN** they validate testable decisions such as target matching, target-boundary eligibility, enablement state, remapping decisions, cursor-position decisions, cursor-lock apply and release decisions, injected-event pass-through, and integer boundary conversion without requiring a desktop mouse observation boundary
+- **THEN** they validate testable decisions such as target matching, target-boundary eligibility, enablement state, remapping decisions, cursor-position decisions, cursor-lock apply and release decisions, and integer boundary conversion without requiring a desktop mouse observation boundary
 
 #### Scenario: Desktop behavior is manually verified
 - **GIVEN** the change is implemented

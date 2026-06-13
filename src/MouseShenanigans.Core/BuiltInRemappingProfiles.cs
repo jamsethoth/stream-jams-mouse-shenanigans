@@ -8,4 +8,6 @@ public static class BuiltInRemappingProfiles
         right: new MovementVector(-1, 0),
         up: new MovementVector(0, -1),
         down: new MovementVector(0, 1));
+
+    public static IReadOnlyList<RemappingProfile> All { get; } = [HorizontalInversion];
 }

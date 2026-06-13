@@ -110,6 +110,74 @@ public sealed class RuntimeCommandControllerTests
         Assert.Same(configuration, configurationController.Current);
     }
 
+    [Fact]
+    public void CaptureForegroundTargetPersistsForegroundProcessAndAppliesRuntimeOptions()
+    {
+        RuntimeConfiguration configuration = RuntimeConfigurationControllerTests.CreateConfiguration();
+        var store = new RecordingConfigurationStore(configuration);
+        var configurationController = new RuntimeConfigurationController(
+            store,
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Enabled);
+        var targetReader = new StubTargetWindowReader(new TargetWindowSnapshot(
+            foregroundWindow: new TargetWindowInfo("notepad", "Untitled - Notepad"),
+            windowUnderCursor: null));
+        var controller = new RuntimeCommandController(runtime, configurationController, targetReader);
+
+        RuntimeConfigurationOperationResult result = controller.CaptureForegroundTarget();
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("notepad", configurationController.Current.TargetSelector.ProcessName);
+        Assert.Single(store.SavedConfigurations);
+        Assert.Equal("notepad", store.SavedConfigurations[0].TargetSelector.ProcessName);
+        Assert.Equal("notepad", runtime.AppliedOptions.Single().TargetSelector.ProcessName);
+    }
+
+    [Fact]
+    public void CaptureForegroundTargetFallsBackToWindowTitleWhenProcessNameIsUnavailable()
+    {
+        RuntimeConfiguration configuration = RuntimeConfigurationControllerTests.CreateConfiguration();
+        var store = new RecordingConfigurationStore(configuration);
+        var configurationController = new RuntimeConfigurationController(
+            store,
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Enabled);
+        var targetReader = new StubTargetWindowReader(new TargetWindowSnapshot(
+            foregroundWindow: new TargetWindowInfo(processName: null, title: "Untitled - Notepad"),
+            windowUnderCursor: null));
+        var controller = new RuntimeCommandController(runtime, configurationController, targetReader);
+
+        RuntimeConfigurationOperationResult result = controller.CaptureForegroundTarget();
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Untitled - Notepad", configurationController.Current.TargetSelector.WindowTitleContains);
+        Assert.Null(configurationController.Current.TargetSelector.ProcessName);
+        Assert.Equal("Untitled - Notepad", runtime.AppliedOptions.Single().TargetSelector.WindowTitleContains);
+    }
+
+    [Fact]
+    public void CaptureForegroundTargetFailureKeepsLastKnownGoodRuntimeOptions()
+    {
+        RuntimeConfiguration configuration = RuntimeConfigurationControllerTests.CreateConfiguration();
+        var store = new RecordingConfigurationStore(configuration);
+        var configurationController = new RuntimeConfigurationController(
+            store,
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Enabled);
+        var controller = new RuntimeCommandController(
+            runtime,
+            configurationController,
+            new StubTargetWindowReader(TargetWindowSnapshot.Empty));
+
+        RuntimeConfigurationOperationResult result = controller.CaptureForegroundTarget();
+
+        Assert.False(result.Succeeded);
+        Assert.Same(configuration, configurationController.Current);
+        Assert.Empty(store.SavedConfigurations);
+        Assert.Empty(runtime.AppliedOptions);
+        Assert.Contains("Target capture failed", configurationController.StatusMessage, StringComparison.Ordinal);
+    }
+
     private sealed class RecordingRuntimeController(RuntimeRemappingStatus status) : IRuntimeRemappingController
     {
         public RuntimeRemappingStatus Status { get; private set; } = status;
@@ -177,6 +245,14 @@ public sealed class RuntimeCommandControllerTests
         public void Save(RuntimeConfiguration configuration)
         {
             SavedConfigurations.Add(configuration);
+        }
+    }
+
+    private sealed class StubTargetWindowReader(TargetWindowSnapshot snapshot) : ITargetWindowReader
+    {
+        public TargetWindowSnapshot ReadSnapshot()
+        {
+            return snapshot;
         }
     }
 }
