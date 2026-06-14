@@ -1,0 +1,59 @@
+{
+  "id": "mouse-shenanigans-local-control",
+  "name": "Mouse Shenanigans Local Control",
+  "version": "0.1.0",
+  "description": "Manual Streamer.bot actions for testing the Mouse Shenanigans localhost control surface.",
+  "license": "AGPL-3.0-or-later",
+  "group": "Mouse Shenanigans Local Control",
+  "actions": [
+    {
+      "name": "MSLC - Configure Defaults",
+      "source": "src/actions/configure-defaults.cs",
+      "autoRun": true
+    },
+    {
+      "name": "MSLC - Get Status",
+      "source": "src/actions/get-status.cs"
+    },
+    {
+      "name": "MSLC - Enable Runtime",
+      "source": "src/actions/enable-runtime.cs"
+    },
+    {
+      "name": "MSLC - Disable Runtime",
+      "source": "src/actions/disable-runtime.cs"
+    },
+    {
+      "name": "MSLC - Toggle Runtime",
+      "source": "src/actions/toggle-runtime.cs"
+    },
+    {
+      "name": "MSLC - Emergency Disable",
+      "source": "src/actions/emergency-disable.cs"
+    },
+    {
+      "name": "MSLC - Capture Foreground Target",
+      "source": "src/actions/capture-foreground-target.cs"
+    },
+    {
+      "name": "MSLC - Get Profiles",
+      "source": "src/actions/get-profiles.cs"
+    },
+    {
+      "name": "MSLC - Select Horizontal Inversion",
+      "source": "src/actions/select-horizontal-inversion.cs"
+    },
+    {
+      "name": "MSLC - Select Double Right",
+      "source": "src/actions/select-double-right.cs"
+    },
+    {
+      "name": "MSLC - Reload Config",
+      "source": "src/actions/reload-config.cs"
+    }
+  ],
+  "references": [
+    "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\System.dll",
+    "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\System.Core.dll"
+  ]
+}

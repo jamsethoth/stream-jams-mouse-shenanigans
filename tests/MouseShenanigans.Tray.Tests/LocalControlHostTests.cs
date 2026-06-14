@@ -68,6 +68,44 @@ public sealed class LocalControlHostTests
         Assert.Equal(LocalControlHostState.Stopped, host.Status.State);
     }
 
+    [Fact]
+    public void DisposeStillMarksStoppedWhenStopFails()
+    {
+        var factory = new RecordingApplicationFactory
+        {
+            StopException = new InvalidOperationException("stop hung"),
+        };
+        using var host = new LocalControlHost(
+            LocalControlOptions.Default,
+            CreateHandler(),
+            factory);
+        host.Start();
+
+        host.Dispose();
+
+        Assert.Equal(["start", "stop", "dispose"], factory.Applications[0].Operations);
+        Assert.Equal(LocalControlHostState.Stopped, host.Status.State);
+    }
+
+    [Fact]
+    public void DisposeStillMarksStoppedWhenApplicationDisposeFails()
+    {
+        var factory = new RecordingApplicationFactory
+        {
+            DisposeException = new InvalidOperationException("dispose failed"),
+        };
+        using var host = new LocalControlHost(
+            LocalControlOptions.Default,
+            CreateHandler(),
+            factory);
+        host.Start();
+
+        host.Dispose();
+
+        Assert.Equal(["start", "stop", "dispose"], factory.Applications[0].Operations);
+        Assert.Equal(LocalControlHostState.Stopped, host.Status.State);
+    }
+
     private static LocalControlEndpointHandler CreateHandler()
     {
         var runtime = new RecordingRuntimeController();
@@ -78,6 +116,10 @@ public sealed class LocalControlHostTests
     {
         public Exception? CreateException { get; init; }
 
+        public Exception? StopException { get; init; }
+
+        public Exception? DisposeException { get; init; }
+
         public List<RecordingApplication> Applications { get; } = [];
 
         public ILocalControlWebApplication Create(LocalControlOptions options, LocalControlEndpointHandler handler)
@@ -87,13 +129,14 @@ public sealed class LocalControlHostTests
                 throw CreateException;
             }
 
-            var application = new RecordingApplication();
+            var application = new RecordingApplication(StopException, DisposeException);
             Applications.Add(application);
             return application;
         }
     }
 
-    private sealed class RecordingApplication : ILocalControlWebApplication
+    private sealed class RecordingApplication(Exception? stopException, Exception? disposeException)
+        : ILocalControlWebApplication
     {
         public List<string> Operations { get; } = [];
 
@@ -105,11 +148,19 @@ public sealed class LocalControlHostTests
         public void StopAcceptingRequests()
         {
             Operations.Add("stop");
+            if (stopException is not null)
+            {
+                throw stopException;
+            }
         }
 
         public void Dispose()
         {
             Operations.Add("dispose");
+            if (disposeException is not null)
+            {
+                throw disposeException;
+            }
         }
     }
 

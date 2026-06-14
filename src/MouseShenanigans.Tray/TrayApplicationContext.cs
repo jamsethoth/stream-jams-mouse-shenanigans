@@ -78,7 +78,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
             HideNotifyIcon,
             DisposeExitResources,
             ExitThread,
-            localControlHost);
+            localControlHost,
+            forceExit: static () => Environment.Exit(0),
+            forceExitDelay: TimeSpan.FromSeconds(5));
 
         notifyIcon = new NotifyIcon
         {
@@ -198,20 +200,50 @@ internal sealed class TrayApplicationContext : ApplicationContext
         var handler = new LocalControlEndpointHandler(
             commandController,
             getDegradedStatusMessage: () => null,
-            requestStatusRefresh: () =>
-            {
-                if (synchronizationContext is null)
-                {
-                    refreshStatus();
-                    return;
-                }
-
-                synchronizationContext.Post(_ => refreshStatus(), null);
-            });
+            requestStatusRefresh: () => RunOnSynchronizationContext(synchronizationContext, refreshStatus),
+            runRequestOnControlThread: operation => RunOnSynchronizationContext(synchronizationContext, operation));
 
         return new LocalControlHost(
             LocalControlOptions.Default,
             handler,
             new KestrelLocalControlWebApplicationFactory());
+    }
+
+    private static void RunOnSynchronizationContext(SynchronizationContext? synchronizationContext, Action action)
+    {
+        RunOnSynchronizationContext(
+            synchronizationContext,
+            () =>
+            {
+                action();
+                return true;
+            });
+    }
+
+    private static T RunOnSynchronizationContext<T>(
+        SynchronizationContext? synchronizationContext,
+        Func<T> operation)
+    {
+        if (synchronizationContext is null || SynchronizationContext.Current == synchronizationContext)
+        {
+            return operation();
+        }
+
+        var completion = new TaskCompletionSource<T>();
+        synchronizationContext.Post(
+            _ =>
+            {
+                try
+                {
+                    completion.SetResult(operation());
+                }
+                catch (Exception ex)
+                {
+                    completion.SetException(ex);
+                }
+            },
+            null);
+
+        return completion.Task.GetAwaiter().GetResult();
     }
 }

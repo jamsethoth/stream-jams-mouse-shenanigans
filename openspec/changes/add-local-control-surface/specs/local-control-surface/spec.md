@@ -23,13 +23,14 @@ The system SHALL host a localhost-only HTTP JSON control surface for the lifetim
 - **AND** runtime disposal still releases remapping and cursor-lock resources
 
 ### Requirement: Runtime command endpoints
-The system SHALL expose local HTTP endpoints for status, enable, disable, toggle, and emergency-disable commands.
+The system SHALL expose local HTTP endpoints for status, enable, disable, toggle, emergency-disable, and foreground target capture commands.
 
 #### Scenario: Status endpoint returns runtime snapshot
 - **GIVEN** the local control listener is running
 - **WHEN** a client requests `GET /api/v1/status`
 - **THEN** the response is JSON
 - **AND** it includes runtime enabled state, cursor-lock setting, active profile, available profiles, and any degraded status message available to the tray
+- **AND** it includes the current target display name when runtime configuration is available
 
 #### Scenario: Enable endpoint enables runtime
 - **GIVEN** the local control listener is running
@@ -56,6 +57,20 @@ The system SHALL expose local HTTP endpoints for status, enable, disable, toggle
 - **THEN** the shared runtime command boundary emergency-disables the runtime
 - **AND** any active cursor lock is released
 - **AND** the response is a successful JSON runtime snapshot
+
+#### Scenario: Capture foreground target endpoint retargets runtime
+- **GIVEN** the local control listener is running
+- **AND** the foreground window identity is readable
+- **WHEN** a client posts to `/api/v1/target/capture-foreground`
+- **THEN** the shared runtime command boundary captures the foreground window as the current target
+- **AND** the response is a successful JSON runtime snapshot containing the new target display name
+
+#### Scenario: Capture foreground target endpoint reports capture failure
+- **GIVEN** the local control listener is running
+- **AND** no foreground window identity is available
+- **WHEN** a client posts to `/api/v1/target/capture-foreground`
+- **THEN** the response is JSON with `ok` set to `false`
+- **AND** the active runtime target is unchanged
 
 ### Requirement: Profile and configuration endpoints
 The system SHALL expose local HTTP endpoints for profile listing, active profile selection, and configuration reload after runtime profile configuration exists.
@@ -91,9 +106,9 @@ The system SHALL cover local control routing and command dispatch with automated
 #### Scenario: Automated local control tests do not require Streamer.bot
 - **GIVEN** automated tests run
 - **WHEN** local control tests execute
-- **THEN** they validate endpoint routing, JSON response shape, command dispatch, invalid profile handling, and listener lifecycle without requiring Streamer.bot
+- **THEN** they validate endpoint routing, JSON response shape, command dispatch, target capture handling, invalid profile handling, and listener lifecycle without requiring Streamer.bot
 
 #### Scenario: Streamer.bot integration is manually verified
 - **GIVEN** the change is implemented
 - **WHEN** manual Windows verification is performed
-- **THEN** verification covers calling enable, disable, toggle, emergency disable, select profile, reload configuration, and status endpoints from Streamer.bot or equivalent local HTTP tooling
+- **THEN** verification covers calling enable, disable, toggle, emergency disable, capture foreground target, select profile, reload configuration, and status endpoints from Streamer.bot or equivalent local HTTP tooling

@@ -50,16 +50,26 @@ public sealed class LocalControlHost : IDisposable
             return;
         }
 
+        disposed = true;
         try
         {
             application?.StopAcceptingRequests();
         }
+        catch (Exception)
+        {
+        }
         finally
         {
-            application?.Dispose();
+            try
+            {
+                application?.Dispose();
+            }
+            catch (Exception)
+            {
+            }
+
             application = null;
             Status = LocalControlHostStatus.Stopped;
-            disposed = true;
         }
     }
 }

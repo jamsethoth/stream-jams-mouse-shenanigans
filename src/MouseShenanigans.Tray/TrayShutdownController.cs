@@ -9,6 +9,8 @@ public sealed class TrayShutdownController
     private readonly Action hideTrayIcon;
     private readonly Action disposeExitResources;
     private readonly Action exitThread;
+    private readonly Action? forceExit;
+    private readonly TimeSpan forceExitDelay;
     private bool exitRequested;
 
     public TrayShutdownController(
@@ -33,13 +35,17 @@ public sealed class TrayShutdownController
         Action hideTrayIcon,
         Action disposeExitResources,
         Action exitThread,
-        IDisposable? localControlHost = null)
+        IDisposable? localControlHost = null,
+        Action? forceExit = null,
+        TimeSpan? forceExitDelay = null)
     {
         this.runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
         this.localControlHost = localControlHost;
         this.hideTrayIcon = hideTrayIcon ?? throw new ArgumentNullException(nameof(hideTrayIcon));
         this.disposeExitResources = disposeExitResources ?? throw new ArgumentNullException(nameof(disposeExitResources));
         this.exitThread = exitThread ?? throw new ArgumentNullException(nameof(exitThread));
+        this.forceExit = forceExit;
+        this.forceExitDelay = forceExitDelay ?? Timeout.InfiniteTimeSpan;
     }
 
     public void RequestExit()
@@ -50,7 +56,7 @@ public sealed class TrayShutdownController
         }
 
         exitRequested = true;
-        hideTrayIcon();
+        ScheduleForcedExit();
         try
         {
             disposeExitResources();
@@ -69,9 +75,32 @@ public sealed class TrayShutdownController
                 }
                 finally
                 {
-                    exitThread();
+                    try
+                    {
+                        hideTrayIcon();
+                    }
+                    finally
+                    {
+                        exitThread();
+                    }
                 }
             }
         }
+    }
+
+    private void ScheduleForcedExit()
+    {
+        if (forceExit is null || forceExitDelay == Timeout.InfiniteTimeSpan)
+        {
+            return;
+        }
+
+        _ = ForceExitAfterDelayAsync();
+    }
+
+    private async Task ForceExitAfterDelayAsync()
+    {
+        await Task.Delay(forceExitDelay).ConfigureAwait(false);
+        forceExit?.Invoke();
     }
 }

@@ -29,6 +29,7 @@ public sealed class LocalControlEndpointHandlerTests
         Assert.True(response.Ok);
         Assert.Equal("disabled", response.State);
         Assert.True(response.CursorLockEnabled);
+        Assert.Equal("TargetApp.exe", response.Target);
         Assert.Equal("horizontal-inversion", response.ActiveProfile);
         Assert.Equal(["horizontal-inversion", "double-right"], response.Profiles);
         Assert.Contains("Local control available", response.Message, StringComparison.Ordinal);
@@ -36,6 +37,7 @@ public sealed class LocalControlEndpointHandlerTests
         string json = JsonSerializer.Serialize(response, JsonOptions);
         Assert.Contains("\"ok\":true", json, StringComparison.Ordinal);
         Assert.Contains("\"cursorLockEnabled\":true", json, StringComparison.Ordinal);
+        Assert.Contains("\"target\":\"TargetApp.exe\"", json, StringComparison.Ordinal);
         Assert.Contains("\"activeProfile\":\"horizontal-inversion\"", json, StringComparison.Ordinal);
     }
 
@@ -97,6 +99,34 @@ public sealed class LocalControlEndpointHandlerTests
     }
 
     [Fact]
+    public void RuntimeCommandEndpointsRunThroughControlThreadDispatcher()
+    {
+        var commandRanInsideDispatcher = false;
+        var isInsideDispatcher = false;
+        var runtime = new RecordingRuntimeController(
+            RuntimeRemappingStatus.Disabled,
+            enableAction: () => commandRanInsideDispatcher = isInsideDispatcher);
+        var handler = new LocalControlEndpointHandler(
+            new RuntimeCommandController(runtime),
+            runRequestOnControlThread: operation =>
+            {
+                isInsideDispatcher = true;
+                try
+                {
+                    return operation();
+                }
+                finally
+                {
+                    isInsideDispatcher = false;
+                }
+            });
+
+        handler.Execute(RuntimeCommand.EnableRuntime);
+
+        Assert.True(commandRanInsideDispatcher);
+    }
+
+    [Fact]
     public void DisableAndEmergencyDisableReleaseCursorLockThroughRuntime()
     {
         var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Enabled);
@@ -109,6 +139,67 @@ public sealed class LocalControlEndpointHandlerTests
 
         Assert.False(runtime.IsCursorLockEnabled);
         Assert.Equal(2, runtime.DisableRequests);
+    }
+
+    [Fact]
+    public void CaptureForegroundTargetSuccessPersistsTargetAppliesOptionsAndRefreshesStatus()
+    {
+        RuntimeConfiguration configuration = CreateConfiguration();
+        var store = new RecordingConfigurationStore(configuration);
+        var configurationController = new RuntimeConfigurationController(
+            store,
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Disabled);
+        var refreshRequests = 0;
+        var handler = new LocalControlEndpointHandler(
+            new RuntimeCommandController(
+                runtime,
+                configurationController,
+                new StubTargetWindowReader(new TargetWindowSnapshot(
+                    foregroundWindow: new TargetWindowInfo("notepad", "Untitled - Notepad"),
+                    windowUnderCursor: null))),
+            requestStatusRefresh: () => refreshRequests++);
+
+        LocalControlEndpointResult result = handler.CaptureForegroundTarget();
+
+        Assert.Equal(200, result.StatusCode);
+        var response = Assert.IsType<LocalControlRuntimeSnapshotResponse>(result.Body);
+        Assert.True(response.Ok);
+        Assert.Equal("notepad.exe", response.Target);
+        Assert.Equal("notepad", configurationController.Current.TargetSelector.ProcessName);
+        Assert.Equal("notepad", store.SavedConfigurations.Single().TargetSelector.ProcessName);
+        Assert.Equal("notepad", runtime.AppliedOptions.Single().TargetSelector.ProcessName);
+        Assert.Equal(1, refreshRequests);
+    }
+
+    [Fact]
+    public void CaptureForegroundTargetFailureReturnsErrorAndKeepsLastKnownGoodTarget()
+    {
+        RuntimeConfiguration configuration = CreateConfiguration();
+        var store = new RecordingConfigurationStore(configuration);
+        var configurationController = new RuntimeConfigurationController(
+            store,
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Disabled);
+        var refreshRequests = 0;
+        var handler = new LocalControlEndpointHandler(
+            new RuntimeCommandController(
+                runtime,
+                configurationController,
+                new StubTargetWindowReader(TargetWindowSnapshot.Empty)),
+            requestStatusRefresh: () => refreshRequests++);
+
+        LocalControlEndpointResult result = handler.CaptureForegroundTarget();
+
+        Assert.Equal(400, result.StatusCode);
+        var response = Assert.IsType<LocalControlErrorResponse>(result.Body);
+        Assert.False(response.Ok);
+        Assert.Equal(LocalControlErrorCodes.TargetCaptureFailed, response.Error);
+        Assert.Contains("no foreground window", response.Message, StringComparison.Ordinal);
+        Assert.Equal("TargetApp", configurationController.Current.TargetSelector.ProcessName);
+        Assert.Empty(store.SavedConfigurations);
+        Assert.Empty(runtime.AppliedOptions);
+        Assert.Equal(1, refreshRequests);
     }
 
     [Fact]
@@ -221,7 +312,10 @@ public sealed class LocalControlEndpointHandlerTests
             RemappingProfileSet.Create([RuntimeProofOfConceptDefaults.HorizontalInversionProfile, doubleRight]));
     }
 
-    private sealed class RecordingRuntimeController(RuntimeRemappingStatus status) : IRuntimeRemappingController
+    private sealed class RecordingRuntimeController(
+        RuntimeRemappingStatus status,
+        Action? enableAction = null,
+        Action? disableAction = null) : IRuntimeRemappingController
     {
         public RuntimeRemappingStatus Status { get; private set; } = status;
 
@@ -247,12 +341,14 @@ public sealed class LocalControlEndpointHandlerTests
         public void Enable()
         {
             EnableRequests++;
+            enableAction?.Invoke();
             Status = RuntimeRemappingStatus.Enabled;
         }
 
         public void Disable()
         {
             DisableRequests++;
+            disableAction?.Invoke();
             IsCursorLockEnabled = false;
             Status = RuntimeRemappingStatus.Disabled;
         }
@@ -290,6 +386,14 @@ public sealed class LocalControlEndpointHandlerTests
         public void Save(RuntimeConfiguration configuration)
         {
             SavedConfigurations.Add(configuration);
+        }
+    }
+
+    private sealed class StubTargetWindowReader(TargetWindowSnapshot snapshot) : ITargetWindowReader
+    {
+        public TargetWindowSnapshot ReadSnapshot()
+        {
+            return snapshot;
         }
     }
 }

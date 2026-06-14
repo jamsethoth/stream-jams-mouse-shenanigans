@@ -11,6 +11,8 @@ namespace MouseShenanigans.Tray;
 
 public sealed class KestrelLocalControlWebApplicationFactory : ILocalControlWebApplicationFactory
 {
+    private static readonly TimeSpan ShutdownTimeout = TimeSpan.FromSeconds(2);
+
     public ILocalControlWebApplication Create(LocalControlOptions options, LocalControlEndpointHandler handler)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -32,6 +34,7 @@ public sealed class KestrelLocalControlWebApplicationFactory : ILocalControlWebA
         app.MapPost("/api/v1/runtime/disable", () => ToHttpResult(handler.Execute(RuntimeCommand.DisableRuntime)));
         app.MapPost("/api/v1/runtime/toggle", () => ToHttpResult(handler.Execute(RuntimeCommand.ToggleRuntime)));
         app.MapPost("/api/v1/runtime/emergency-disable", () => ToHttpResult(handler.Execute(RuntimeCommand.EmergencyDisable)));
+        app.MapPost("/api/v1/target/capture-foreground", () => ToHttpResult(handler.CaptureForegroundTarget()));
         app.MapGet("/api/v1/profiles", () => ToHttpResult(handler.GetProfiles()));
         app.MapPost("/api/v1/profiles/select", async (HttpRequest request) =>
         {
@@ -69,12 +72,23 @@ public sealed class KestrelLocalControlWebApplicationFactory : ILocalControlWebA
 
         public void StopAcceptingRequests()
         {
-            app.StopAsync().GetAwaiter().GetResult();
+            using var cancellation = new CancellationTokenSource(ShutdownTimeout);
+            try
+            {
+                app.StopAsync(cancellation.Token).GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException)
+            {
+            }
         }
 
         public void Dispose()
         {
-            app.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            Task disposeTask = app.DisposeAsync().AsTask();
+            if (disposeTask.Wait(ShutdownTimeout))
+            {
+                disposeTask.GetAwaiter().GetResult();
+            }
         }
     }
 }
