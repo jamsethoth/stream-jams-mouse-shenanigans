@@ -48,13 +48,13 @@
 
 ## 7. Manual Windows And Streamer.bot Verification
 
-- [ ] 7.1 Launch the tray app in a real Windows desktop session and verify the local control URL is available on loopback only.
-- [ ] 7.2 Call `GET /api/v1/status` from PowerShell, curl, or Streamer.bot and verify JSON status is parseable.
-- [ ] 7.3 Call enable, disable, toggle, emergency-disable, and foreground target capture endpoints and verify runtime behavior matches tray/hotkey commands.
-- [ ] 7.4 Call profile list and select profile endpoints after profile configuration exists and verify remapping switches profiles.
-- [ ] 7.5 Call config reload endpoint with valid and invalid config files and verify success/error responses and last-known-good behavior.
-- [ ] 7.6 Verify listener failure behavior by forcing a port conflict or invalid URL and confirming tray/manual controls remain usable.
-- [ ] 7.7 Import the generated Streamer.bot step 8 `.sb` into a disposable Streamer.bot profile and verify the preview shows the expected `MSLC` actions.
-- [ ] 7.8 Compile the imported Streamer.bot C# sub-actions and run `MSLC - Configure Defaults`.
-- [ ] 7.9 Run the imported Streamer.bot `MSLC` actions for status, runtime commands, target capture, profile selection, and config reload, then verify the JSON responses match the PowerShell/manual endpoint results.
-- [ ] 7.10 Record any Streamer.bot action, local firewall, loopback, port, or JSON parsing limitation found during manual testing.
+- [x] 7.1 Launch the tray app in a real Windows desktop session and verify the local control URL is available on loopback only.
+- [x] 7.2 Call `GET /api/v1/status` from PowerShell, curl, or Streamer.bot and verify JSON status is parseable.
+- [x] 7.3 Call enable, disable, toggle, emergency-disable, and foreground target capture endpoints and verify runtime behavior matches tray/hotkey commands.
+- [x] 7.4 Call profile list and select profile endpoints after profile configuration exists and verify remapping switches profiles.
+- [x] 7.5 Call config reload endpoint with valid and invalid config files and verify success/error responses and last-known-good behavior.
+- [x] 7.6 Verify listener failure behavior by forcing a port conflict or invalid URL and confirming tray/manual controls remain usable.
+- [x] 7.7 Import the generated Streamer.bot step 8 `.sb` into a disposable Streamer.bot profile and verify the preview shows the expected `MSLC` actions.
+- [x] 7.8 Compile the imported Streamer.bot C# sub-actions and run `MSLC - Configure Defaults`.
+- [x] 7.9 Run the imported Streamer.bot `MSLC` actions for status, runtime commands, target capture, profile selection, and config reload, then verify the JSON responses match the PowerShell/manual endpoint results.
+- [x] 7.10 Record any Streamer.bot action, local firewall, loopback, port, or JSON parsing limitation found during manual testing.

@@ -422,11 +422,11 @@ if (Test-Path $BackupPath) {
 
 | Task | Result | Notes |
 | --- | --- | --- |
-| 7.1 Loopback launch | Not run | |
-| 7.2 Status JSON | Not run | |
-| 7.3 Runtime commands | Not run | |
-| 7.3 Target capture | Not run | |
-| 7.4 Profile endpoints | Not run | |
-| 7.5 Config reload | Not run | |
-| 7.6 Listener failure | Not run | |
-| 7.7 Streamer.bot limitations | Not run | |
+| 7.1 Loopback launch | Passed | |
+| 7.2 Status JSON | Passed | |
+| 7.3 Runtime commands | Passed | |
+| 7.3 Target capture | Passed | |
+| 7.4 Profile endpoints | Passed | |
+| 7.5 Config reload | Passed | |
+| 7.6 Listener failure | Passed | |
+| 7.7 Streamer.bot limitations | Passed | |
