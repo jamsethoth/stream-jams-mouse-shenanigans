@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Runtime commands are externally invokable
-The proof-of-concept runtime SHALL allow enable, disable, toggle, emergency-disable, and status commands to be invoked through the local control surface after the local listener is available.
+The proof-of-concept runtime SHALL allow enable, disable, toggle, emergency-disable, capture-foreground-target, and status commands to be invoked through the local control surface after the local listener is available.
 
 #### Scenario: External enable command uses runtime command boundary
 - **GIVEN** the local control surface is running
@@ -19,3 +19,10 @@ The proof-of-concept runtime SHALL allow enable, disable, toggle, emergency-disa
 - **GIVEN** the local control surface is running
 - **WHEN** a local control client requests runtime status
 - **THEN** the response reflects the same runtime state and degraded status visible through the tray app
+
+#### Scenario: External target capture uses runtime command boundary
+- **GIVEN** the local control surface is running
+- **AND** a foreground window identity is available
+- **WHEN** a local control client requests foreground target capture
+- **THEN** the shared runtime command boundary persists the foreground window as the runtime target
+- **AND** the runtime options are updated without restarting the tray app

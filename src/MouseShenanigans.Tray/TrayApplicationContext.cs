@@ -20,6 +20,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly TrayConfigurationFolderController configurationFolderController;
     private readonly TrayHotkeyController hotkeyController;
     private readonly TrayHotkeyReceiver hotkeyReceiver;
+    private readonly LocalControlHost localControlHost;
     private readonly TrayShutdownController shutdownController;
     private readonly NotifyIcon notifyIcon;
     private bool disposed;
@@ -66,16 +67,20 @@ internal sealed class TrayApplicationContext : ApplicationContext
         cursorLockItem.Click += (_, _) => cursorLockController.SetCursorLockEnabled(cursorLockItem.Checked);
         reloadConfigurationItem.Click += (_, _) => profileMenuController.ReloadConfiguration();
         openConfigurationFolderItem.Click += (_, _) => configurationFolderController.OpenConfigurationFolder();
-        shutdownController = new TrayShutdownController(
-            runtime,
-            HideNotifyIcon,
-            DisposeExitResources,
-            ExitThread);
         hotkeyController = new TrayHotkeyController(
             new WindowsHotkeyRegistrar(),
             runtimeCommandController,
             UpdateRuntimeStatus);
         hotkeyReceiver = new TrayHotkeyReceiver(hotkeyController.DispatchHotkey);
+        localControlHost = CreateLocalControlHost(runtimeCommandController, UpdateRuntimeStatus);
+        shutdownController = new TrayShutdownController(
+            runtime,
+            HideNotifyIcon,
+            DisposeExitResources,
+            ExitThread,
+            localControlHost,
+            forceExit: static () => Environment.Exit(0),
+            forceExitDelay: TimeSpan.FromSeconds(5));
 
         notifyIcon = new NotifyIcon
         {
@@ -84,6 +89,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             Visible = true,
         };
 
+        localControlHost.Start();
         hotkeyController.Register(
             hotkeyReceiver.WindowHandle,
             DefaultRuntimeHotkeyBindingProvider.Instance.GetBindings());
@@ -99,6 +105,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         if (disposing)
         {
+            localControlHost.Dispose();
             hotkeyController.Dispose();
             hotkeyReceiver.Dispose();
             runtime.Dispose();
@@ -141,7 +148,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         statusItem.Text = TrayStatusFormatter.CreateRuntimeStatusText(
             status,
             runtimeConfigurationController.Current,
-            runtimeConfigurationController.StatusMessage);
+            runtimeConfigurationController.StatusMessage,
+            localControlHost.Status.Message);
         hotkeyStatusItem.Text = TrayStatusFormatter.CreateHotkeyStatusText(
             hotkeyController.RegistrationResult,
             hotkeyController.LastDispatchedCommand,
@@ -182,5 +190,60 @@ internal sealed class TrayApplicationContext : ApplicationContext
         return new RuntimeConfigurationController(
             new RuntimeConfigurationFileStore(new RuntimeConfigurationPathProvider()),
             RuntimeProofOfConceptDefaults.CreateConfiguration());
+    }
+
+    private static LocalControlHost CreateLocalControlHost(
+        RuntimeCommandController commandController,
+        Action refreshStatus)
+    {
+        SynchronizationContext? synchronizationContext = SynchronizationContext.Current;
+        var handler = new LocalControlEndpointHandler(
+            commandController,
+            getDegradedStatusMessage: () => null,
+            requestStatusRefresh: () => RunOnSynchronizationContext(synchronizationContext, refreshStatus),
+            runRequestOnControlThread: operation => RunOnSynchronizationContext(synchronizationContext, operation));
+
+        return new LocalControlHost(
+            LocalControlOptions.Default,
+            handler,
+            new KestrelLocalControlWebApplicationFactory());
+    }
+
+    private static void RunOnSynchronizationContext(SynchronizationContext? synchronizationContext, Action action)
+    {
+        RunOnSynchronizationContext(
+            synchronizationContext,
+            () =>
+            {
+                action();
+                return true;
+            });
+    }
+
+    private static T RunOnSynchronizationContext<T>(
+        SynchronizationContext? synchronizationContext,
+        Func<T> operation)
+    {
+        if (synchronizationContext is null || SynchronizationContext.Current == synchronizationContext)
+        {
+            return operation();
+        }
+
+        var completion = new TaskCompletionSource<T>();
+        synchronizationContext.Post(
+            _ =>
+            {
+                try
+                {
+                    completion.SetResult(operation());
+                }
+                catch (Exception ex)
+                {
+                    completion.SetException(ex);
+                }
+            },
+            null);
+
+        return completion.Task.GetAwaiter().GetResult();
     }
 }

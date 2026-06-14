@@ -15,5 +15,7 @@ internal static class Program
             ApplicationConfiguration.Initialize();
             Application.Run(new TrayApplicationContext());
         }
+
+        Environment.Exit(0);
     }
 }
