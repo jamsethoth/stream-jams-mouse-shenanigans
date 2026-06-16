@@ -1,6 +1,6 @@
 ## 1. Dependency Gates
 
-- [ ] 1.1 Confirm `add-integration-testability-seams` is complete and present in remote `main` before implementation starts.
+- [x] 1.1 Confirm `add-integration-testability-seams` is complete and present in remote `main` before implementation starts.
 - [ ] 1.2 Confirm `add-game-safety-guardrails` is complete and present in remote `main` before implementing guardrails validation cases.
 - [ ] 1.3 Confirm the integration suite can use isolated config path, loopback URL override, diagnostics, fast self-exit interval, and the test-window fixture from the seams change.
 - [ ] 1.4 Decide whether the interactive desktop tests will be opt-in, category-filtered, or skipped automatically when desktop prerequisites are missing.
