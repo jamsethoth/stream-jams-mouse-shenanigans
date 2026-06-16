@@ -1,6 +1,6 @@
 ## Purpose
 
-Define the repository, build, test, documentation, CI, and minimal tray-shell foundation for Stream Jams Mouse Shenanigans before runtime mouse-remapping behavior is added.
+Define the repository, build, test, documentation, CI, and tray-app foundation for Stream Jams Mouse Shenanigans.
 
 ## Requirements
 
@@ -27,34 +27,34 @@ The repository SHALL define shared C# build conventions so project settings are 
 - **THEN** the repository provides an explicit SDK selection policy for the intended .NET major version
 
 ### Requirement: App shell boundary
-The tray app project SHALL compile as a minimal Windows tray-oriented shell without implementing mouse interception, input injection, profile persistence, or external automation endpoints in this change.
+The tray app project SHALL compile as a Windows tray-oriented composition root for runtime controls, configuration, diagnostics, and local automation.
 
-#### Scenario: Tray shell compiles without runtime mouse behavior
+#### Scenario: Tray shell compiles
 - **WHEN** the solution is built
 - **THEN** the tray shell project compiles
-- **AND** it does not install mouse hooks, inject input, persist profiles, or expose local control endpoints
+- **AND** it remains separate from pure core remapping logic
 
 ### Requirement: Baseline tests
-The repository SHALL include automated tests for the pure core behavior introduced by the app foundation.
+The repository SHALL include automated tests for core behavior, Windows adapter behavior, tray behavior, and integration seams.
 
-#### Scenario: Core tests execute in CI
+#### Scenario: Tests execute in CI
 - **WHEN** CI runs the test suite
-- **THEN** the core test project executes and validates the initial pure core behavior without requiring Win32 hooks or a desktop session
+- **THEN** test projects execute without requiring an interactive desktop session by default
 
 #### Scenario: Core test coverage is meaningful
 - **WHEN** the app foundation introduces initial directional mouse logic
 - **THEN** tests cover representative directional delta decomposition behavior for horizontal, vertical, and zero movement
 
 ### Requirement: Manual desktop behavior boundary
-The app foundation SHALL keep real Windows desktop-session behavior checks manual for now instead of introducing an automated desktop UI or input harness.
+The repository SHALL keep desktop-sensitive validation explicit so normal automated checks do not silently depend on foreground-window control or keyboard input.
 
-#### Scenario: Desktop automation harness is not introduced
-- **WHEN** the app foundation is implemented
-- **THEN** it does not add automated tests for tray UI behavior, global hotkeys, low-level mouse hooks, input injection, target-window gating, or Streamer.bot desktop interaction
+#### Scenario: Desktop validation is opt-in
+- **WHEN** desktop-sensitive integration tests are run
+- **THEN** they require explicit opt-in from a real Windows desktop session
 
 #### Scenario: Manual checks are documented
 - **WHEN** a developer reads the repository documentation or implementation checklist
-- **THEN** it identifies desktop-session behavior that must be verified manually until a later change introduces a dedicated automation strategy
+- **THEN** it identifies desktop-session behavior that must be verified manually or through desktop-gated tests
 
 ### Requirement: CI validation
 The repository SHALL validate the .NET app foundation in GitHub Actions.

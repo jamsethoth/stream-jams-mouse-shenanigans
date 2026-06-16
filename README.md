@@ -41,22 +41,23 @@ Each direction can then be mapped to a new output vector. A configuration might 
 
 This keeps the initial idea simple while leaving room for presets such as horizontal inversion, directional scaling, axis swapping, or one-direction-only effects.
 
-## Proposed App And Feature Set
+## App And Feature Set
 
-The proposed app is a small C#/.NET Windows tray utility that:
+The app is a small C#/.NET Windows tray utility that:
 
 - Runs in the background.
 - Provides a global toggle hotkey (`Ctrl+Alt+F8`).
 - Provides an emergency disable hotkey (`Ctrl+Alt+Shift+F8`).
 - Persists named configuration profiles.
 - Switches between profiles while the app is running.
-- Targets a configured window by process name, window title, or selected window handle.
-- Hooks low-level mouse movement through standard Windows APIs.
+- Targets a configured window or application by process name, executable path, or window title text.
+- Observes mouse movement through standard Windows user-session APIs.
 - Applies configured directional remapping only when the target window is active or under the cursor.
 - Injects corrected cursor movement through standard Windows cursor/input APIs.
 - Ignores its own injected movement to avoid feedback loops.
 - Shows basic tray icon status for enabled and disabled states.
 - Exposes a local control surface that external tools can call to toggle behavior, switch profiles, or apply selected config changes.
+- Applies game-safety guardrails so game targets are blocked unless explicitly allowlisted, protected game deny rules win over allowlist entries, and disallowed-game detection exits MouseShenanigans without touching the game process.
 
 The project is intentionally scoped as a user-session desktop utility, not a service or driver. It should be easy to start, stop, disable in an emergency, and inspect while a stream is live.
 
@@ -66,13 +67,9 @@ Profiles should be first-class project concepts rather than separate ad hoc conf
 
 The app should be able to switch profiles immediately while running. That matters for streaming workflows where mouse behavior might become part of a scene, channel-point redemption, chat command, or other live interaction.
 
-The project should also explore a small local integration protocol that Streamer.bot could invoke as an action. Possible shapes include:
+The project exposes a small loopback-only HTTP JSON control surface that Streamer.bot can invoke as actions. It supports runtime enable, disable, toggle, emergency disable, status, diagnostics, foreground target capture, foreground safety allowlist capture, profile listing, active profile selection, and configuration reload.
 
-- A localhost REST API for simple commands such as enable, disable, toggle, select profile, and reload profiles.
-- A localhost WebSocket API for low-latency commands and status updates.
-- Another local IPC mechanism if it fits the Windows tray app model better.
-
-The first implementation does not need to commit to a public remote API. The useful goal is a local, scriptable command surface with enough stability that Streamer.bot or another automation tool can drive it reliably during a stream.
+The app does not expose a public remote API. WebSockets, named pipes, remote access, and profile editing endpoints are outside the current scope unless a later streaming workflow needs them.
 
 ## MVP Scope
 
@@ -89,21 +86,20 @@ The minimum useful version should support:
 
 ## Current Foundation
 
-The repository now contains the first .NET app foundation rather than only project notes. The current scaffold includes:
+The repository now contains the .NET app foundation and the current runtime proof of concept. The current implementation includes:
 
 - `MouseShenanigans.Core`, a pure C# library for app logic that can be tested without Windows desktop APIs, including directional movement decomposition and pure remapping profile behavior.
-- `MouseShenanigans.Windows`, a Windows-specific adapter project for Win32 integration boundaries including runtime remapping and global hotkey registration.
-- `MouseShenanigans.Tray`, a WinForms tray executable with runtime enable/disable controls, cursor lock control, fixed global hotkeys, and tray-visible status.
-- `MouseShenanigans.Core.Tests`, an xUnit test project covering directional delta decomposition and pure remapping profile behavior.
-- GitHub Actions validation for restore, formatting, analyzers, build, tests, dependency review, and one CodeQL C# analysis path.
-
-Profile file persistence, profile switching UI, and Streamer.bot control endpoints remain planned features. The current implementation is still intentionally narrow so the runtime remapping, tray control flow, and Windows boundary behavior can settle before broader configuration and automation work lands.
+- `MouseShenanigans.Windows`, a Windows-specific adapter project for runtime remapping, target-window inspection, cursor output, cursor lock, runtime configuration, global hotkeys, diagnostics, and game-safety policy.
+- `MouseShenanigans.Tray`, a WinForms tray executable with runtime enable/disable controls, cursor lock control, profile switching, configuration reload, target capture, safety allowlist capture, fixed global hotkeys, local-control hosting, and tray-visible status.
+- `MouseShenanigans.TestWindowFixture`, a Windows-only test fixture app for desktop validation.
+- Unit and integration test projects covering core behavior, Windows adapter behavior, tray behavior, local-control behavior, published-app validation, desktop-gated validation, and non-evasive safety scans.
+- GitHub Actions validation for restore, formatting, analyzers, build, tests, OpenSpec specs, dependency review, and one CodeQL C# analysis path.
 
 ## Constraints And Risks
 
 The first version should avoid driver-level implementation and use standard Windows APIs such as:
 
-- `SetWindowsHookEx` with `WH_MOUSE_LL`
+- Raw Input mouse observation
 - `RegisterHotKey`
 - `GetForegroundWindow`
 - `WindowFromPoint`
@@ -139,7 +135,7 @@ The foundation also uses repository-level .NET configuration:
 - `Directory.Packages.props` centralizes NuGet package versions.
 - `.editorconfig` captures formatting and analyzer preferences used by `dotnet format`.
 
-xUnit is used for the initial unit tests because the first automated coverage is pure domain behavior. Automated desktop UI, global input, and Streamer.bot integration tests are intentionally deferred until those runtime features exist and the right test harness is clearer.
+xUnit is used for unit and integration tests. Desktop-sensitive validation is split into explicit Windows integration test categories so normal CI can cover non-desktop logic and local runs can opt into foreground-window and keyboard-input checks from a real Windows desktop session.
 
 ## Local Tooling
 
@@ -171,13 +167,40 @@ The tray app has explicit local-only startup overrides for automated validation.
 
 Invalid overrides are reported through tray/local-control status and diagnostics. Invalid configuration-path overrides do not fall back to the user's production configuration path.
 
-Recent diagnostics are available from the loopback-only local-control endpoint:
+### Local Control
 
-```text
-GET /api/v1/diagnostics
+The tray app hosts a loopback-only HTTP JSON control surface. It uses the configured `MOUSE_SHENANIGANS_LOCAL_CONTROL_URL` when set, otherwise it defaults to `http://127.0.0.1:5178`.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/status` | Return runtime state, cursor-lock state, target, active profile, profiles, and status message. |
+| `GET` | `/api/v1/diagnostics` | Return bounded recent diagnostic events with stable `type`, `timestamp`, `message`, and optional `capturedIdentity` fields. |
+| `POST` | `/api/v1/runtime/enable` | Enable runtime remapping when safety permits. |
+| `POST` | `/api/v1/runtime/disable` | Disable runtime remapping and release cursor lock. |
+| `POST` | `/api/v1/runtime/toggle` | Toggle runtime remapping. |
+| `POST` | `/api/v1/runtime/emergency-disable` | Disable runtime remapping and release cursor lock without requiring a positive safety decision. |
+| `POST` | `/api/v1/target/capture-foreground` | Persist the current foreground window identity as the runtime target. |
+| `POST` | `/api/v1/safety/allowed-applications/capture-foreground` | Start confirmation for adding the foreground window identity to the safety allowlist. |
+| `GET` | `/api/v1/profiles` | Return available profiles and the active profile. |
+| `POST` | `/api/v1/profiles/select` | Select an active profile using `{ "name": "<profile-name>" }`. |
+| `POST` | `/api/v1/config/reload` | Reload runtime configuration from disk. |
+
+Common PowerShell calls:
+
+```powershell
+$base = 'http://127.0.0.1:5178'
+Invoke-RestMethod "$base/api/v1/status"
+Invoke-RestMethod "$base/api/v1/diagnostics"
+Invoke-RestMethod "$base/api/v1/runtime/enable" -Method Post
+Invoke-RestMethod "$base/api/v1/runtime/disable" -Method Post
+Invoke-RestMethod "$base/api/v1/runtime/toggle" -Method Post
+Invoke-RestMethod "$base/api/v1/runtime/emergency-disable" -Method Post
+Invoke-RestMethod "$base/api/v1/profiles"
+Invoke-RestMethod "$base/api/v1/profiles/select" -Method Post -ContentType 'application/json' -Body '{ "name": "horizontal-inversion" }'
+Invoke-RestMethod "$base/api/v1/config/reload" -Method Post
 ```
 
-The response contains bounded recent events with stable `type`, `timestamp`, `message`, and optional `capturedIdentity` fields for validation assertions.
+Foreground capture endpoints require a real interactive desktop session with a usable foreground window. The local control surface is only for loopback automation such as Streamer.bot actions; it is not a public remote API.
 
 The solution also includes `MouseShenanigans.TestWindowFixture`, a Windows-only fixture utility under `tests/`. It opens a normal visible window with a stable process name and default title, and it can write a readiness file when started with `--ready-file <path>`. It is a validation fixture only and is not included when publishing `src\MouseShenanigans.Tray\MouseShenanigans.Tray.csproj`.
 
@@ -185,8 +208,8 @@ The solution also includes `MouseShenanigans.TestWindowFixture`, a Windows-only 
 
 From WSL or Docker, stop at restore, format, build, and non-desktop tests. The Windows tray launch check must be performed manually in a real Windows desktop session.
 
-Actual desktop-session behavior remains manual for now. This includes tray behavior, global hotkeys, low-level mouse hooks, input injection, target-window gating, and Streamer.bot interaction. Automated coverage should stay focused on pure core logic, build validation, formatting, analyzers, and non-desktop tests until the runtime behavior exists and is stable.
+Desktop-session behavior is covered by explicit desktop-gated integration tests and still needs real-session verification when validating a release. This includes tray behavior, global hotkeys, Raw Input mouse observation, cursor output, target-window gating, cursor locking, game-safety self-exit behavior, and Streamer.bot interaction.
 
 ## Current Status
 
-This repository now includes the initial runtime proof of concept on top of the .NET/C# app foundation. The current slices define named directional remapping profiles, a horizontal inversion preset, JSON profile document parsing, a `Streamer.bot.exe`-targeted runtime, tray enable/disable and cursor-lock controls, and fixed global hotkeys (`Ctrl+Alt+F8` and `Ctrl+Alt+Shift+F8`). The next refinements should focus on persisted profile configuration, profile switching, and the preferred local control protocol for Streamer.bot integration.
+This repository now includes the runtime proof of concept on top of the .NET/C# app foundation. The current app supports named directional remapping profiles, a horizontal inversion fallback profile, persisted JSON runtime configuration, runtime profile switching, process/path/title target selection, foreground target capture, tray enable/disable and cursor-lock controls, fixed global hotkeys (`Ctrl+Alt+F8`, `Ctrl+Alt+Shift+F8`, `Ctrl+Alt+F9`, and `Ctrl+Alt+Shift+F9`), loopback HTTP local control, diagnostics, Windows integration validation seams, and game-safety guardrails.

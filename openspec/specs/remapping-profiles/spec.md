@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define pure core remapping profile behavior: profile value objects, profile collections, delta remapping, JSON profile parsing, and the boundary that keeps runtime input hooks and tray controls out of the core profile slice.
+Define pure core remapping profile behavior: profile value objects, profile collections, delta remapping, JSON profile parsing, and the boundary that lets runtime and tray features consume profiles without putting Windows desktop APIs into core profile logic.
 
 ## Requirements
 
@@ -98,12 +98,12 @@ The system SHALL parse UTF-8 JSON profile documents containing named profiles an
 - **THEN** parsing fails with a validation error instead of returning a partially valid collection
 
 ### Requirement: Runtime integration boundary
-The remapping profile slice SHALL remain pure core behavior and SHALL NOT add Windows mouse hooks, input injection, target-window gating, tray profile controls, hotkeys, profile file persistence, or local automation endpoints.
+The core remapping profile model SHALL remain independent of Windows desktop APIs while runtime, tray, persistence, and local automation layers consume validated profiles.
 
 #### Scenario: Core tests exercise remapping without desktop APIs
 - **WHEN** automated tests validate remapping profiles
 - **THEN** they execute without requiring Win32 hooks, a Windows desktop session, cursor injection, target-window state, tray UI, or Streamer.bot
 
-#### Scenario: Runtime features remain deferred
-- **WHEN** this change is implemented
-- **THEN** Windows hook installation, input injection, target-window selection, tray profile switching, global hotkeys, profile file persistence, and local control endpoints remain unimplemented
+#### Scenario: Runtime layers consume profiles
+- **WHEN** runtime configuration selects a validated profile
+- **THEN** Windows runtime, tray profile switching, profile persistence, hotkeys, and local control endpoints use that profile through the runtime configuration boundary
