@@ -40,13 +40,15 @@ public static class RuntimeConfigurationJsonSerializer
 
             RuntimeTargetSelector targetSelector = RuntimeTargetSelector.Create(
                 document.Target.ProcessName,
+                document.Target.ExecutablePath,
                 document.Target.WindowTitleContains);
 
             return RuntimeConfiguration.CreateFromConfiguredProfiles(
                 targetSelector,
                 document.ActiveProfile ?? string.Empty,
                 document.CursorLockEnabled.Value,
-                document.Profiles?.Select(ToProfile) ?? []);
+                document.Profiles?.Select(ToProfile) ?? [],
+                ToSafetyConfiguration(document.Safety));
         }
         catch (JsonException exception)
         {
@@ -54,7 +56,9 @@ public static class RuntimeConfigurationJsonSerializer
         }
         catch (ArgumentException exception)
         {
-            throw new InvalidDataException("Runtime configuration JSON document is invalid.", exception);
+            throw new InvalidDataException(
+                $"Runtime configuration JSON document is invalid: {exception.Message}",
+                exception);
         }
         catch (KeyNotFoundException exception)
         {
@@ -71,11 +75,13 @@ public static class RuntimeConfigurationJsonSerializer
             Target = new TargetDto
             {
                 ProcessName = configuration.TargetSelector.ProcessName,
+                ExecutablePath = configuration.TargetSelector.ExecutablePath,
                 WindowTitleContains = configuration.TargetSelector.WindowTitleContains,
             },
             ActiveProfile = configuration.ActiveProfileName,
             CursorLockEnabled = configuration.CursorLockEnabled,
             Profiles = configuration.ConfiguredProfiles.Select(ToDto).ToArray(),
+            Safety = ToDto(configuration.Safety),
         };
 
         return JsonSerializer.Serialize(document, JsonOptions);
@@ -128,6 +134,72 @@ public static class RuntimeConfigurationJsonSerializer
         };
     }
 
+    private static ApplicationSafetyConfiguration ToSafetyConfiguration(SafetyDto? safety)
+    {
+        if (safety is null)
+        {
+            return ApplicationSafetyConfiguration.Empty;
+        }
+
+        return new ApplicationSafetyConfiguration(
+            allowedApplications: ToSafetyEntries(
+                safety.AllowlistedGames ?? safety.AllowedApplications,
+                safety.AllowlistedGames is null ? "allowedApplications" : "allowlistedGames"),
+            protectedGameDenyRules: ToSafetyEntries(
+                safety.ProtectedGameDenyRules ?? safety.SelfExitApplications,
+                safety.ProtectedGameDenyRules is null ? "selfExitApplications" : "protectedGameDenyRules"),
+            gameLibraryRoots: safety.GameLibraryRoots,
+            gameProcessPatterns: safety.GameProcessPatterns);
+    }
+
+    private static ApplicationSafetyEntry[] ToSafetyEntries(
+        IReadOnlyList<ApplicationSafetyEntryDto>? entries,
+        string collectionName)
+    {
+        if (entries is null)
+        {
+            return [];
+        }
+
+        return entries
+            .Select((entry, index) => ToSafetyEntry(entry, $"{collectionName}[{index}]"))
+            .ToArray();
+    }
+
+    private static ApplicationSafetyEntry ToSafetyEntry(ApplicationSafetyEntryDto? entry, string name)
+    {
+        if (entry is null)
+        {
+            throw new InvalidDataException($"Runtime safety configuration {name} entry must not be null.");
+        }
+
+        return new ApplicationSafetyEntry(
+            new ApplicationIdentity(entry.ProcessName, entry.ExecutablePath, entry.WindowTitleContains),
+            entry.Label);
+    }
+
+    private static SafetyDto ToDto(ApplicationSafetyConfiguration safety)
+    {
+        return new SafetyDto
+        {
+            AllowlistedGames = safety.AllowlistedGames.Select(ToDto).ToArray(),
+            ProtectedGameDenyRules = safety.ProtectedGameDenyRules.Select(ToDto).ToArray(),
+            GameLibraryRoots = safety.GameLibraryRoots.ToArray(),
+            GameProcessPatterns = safety.GameProcessPatterns.ToArray(),
+        };
+    }
+
+    private static ApplicationSafetyEntryDto ToDto(ApplicationSafetyEntry entry)
+    {
+        return new ApplicationSafetyEntryDto
+        {
+            Label = entry.Label,
+            ProcessName = entry.Identity.ProcessName,
+            ExecutablePath = entry.Identity.ExecutablePath,
+            WindowTitleContains = entry.Identity.WindowTitleContains,
+        };
+    }
+
     private static VectorDto ToDto(MovementVector vector)
     {
         return new VectorDto
@@ -146,11 +218,41 @@ public static class RuntimeConfigurationJsonSerializer
         public bool? CursorLockEnabled { get; init; }
 
         public IReadOnlyList<ProfileDto>? Profiles { get; init; }
+
+        public SafetyDto? Safety { get; init; }
     }
 
     private sealed class TargetDto
     {
         public string? ProcessName { get; init; }
+
+        public string? ExecutablePath { get; init; }
+
+        public string? WindowTitleContains { get; init; }
+    }
+
+    private sealed class SafetyDto
+    {
+        public IReadOnlyList<ApplicationSafetyEntryDto>? AllowlistedGames { get; init; }
+
+        public IReadOnlyList<ApplicationSafetyEntryDto>? ProtectedGameDenyRules { get; init; }
+
+        public IReadOnlyList<string>? GameLibraryRoots { get; init; }
+
+        public IReadOnlyList<string>? GameProcessPatterns { get; init; }
+
+        public IReadOnlyList<ApplicationSafetyEntryDto>? AllowedApplications { get; init; }
+
+        public IReadOnlyList<ApplicationSafetyEntryDto>? SelfExitApplications { get; init; }
+    }
+
+    private sealed class ApplicationSafetyEntryDto
+    {
+        public string? Label { get; init; }
+
+        public string? ProcessName { get; init; }
+
+        public string? ExecutablePath { get; init; }
 
         public string? WindowTitleContains { get; init; }
     }

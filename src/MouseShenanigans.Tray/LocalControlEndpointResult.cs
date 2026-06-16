@@ -9,6 +9,11 @@ public sealed record LocalControlEndpointResult(int StatusCode, object Body)
         return new LocalControlEndpointResult(StatusCodes.Status200OK, body);
     }
 
+    public static LocalControlEndpointResult Accepted(object body)
+    {
+        return new LocalControlEndpointResult(StatusCodes.Status202Accepted, body);
+    }
+
     public static LocalControlEndpointResult BadRequest(LocalControlErrorResponse body)
     {
         return new LocalControlEndpointResult(StatusCodes.Status400BadRequest, body);

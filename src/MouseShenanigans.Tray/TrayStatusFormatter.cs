@@ -20,7 +20,9 @@ public static class TrayStatusFormatter
         RuntimeConfiguration? configuration = null,
         string? configurationStatus = null,
         string? localControlStatus = null,
-        string? startupValidationStatus = null)
+        string? startupValidationStatus = null,
+        string? applicationSafetyStatus = null,
+        string? selfExitStatus = null)
     {
         string target = configuration?.TargetDisplayName ?? RuntimeProofOfConceptDefaults.TargetProcessName;
         string profile = configuration?.ActiveProfileName ?? RuntimeProofOfConceptDefaults.ActiveProfileName;
@@ -32,9 +34,18 @@ public static class TrayStatusFormatter
             _ => $"Disabled for {target} using {profile}",
         };
 
-        string[] messages = new[] { status.Message, configurationStatus, localControlStatus, startupValidationStatus }
+        string[] messages = new[]
+            {
+                status.Message,
+                configurationStatus,
+                localControlStatus,
+                startupValidationStatus,
+                applicationSafetyStatus,
+                selfExitStatus,
+            }
             .Where(message => !string.IsNullOrWhiteSpace(message))
             .Select(message => message!)
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
 
         return messages.Length == 0

@@ -32,6 +32,16 @@ internal sealed class LocalControlClient : IDisposable
         return PostJsonAsync("/api/v1/target/capture-foreground", cancellationToken);
     }
 
+    public Task<JsonDocument> EnableRuntimeAsync(CancellationToken cancellationToken = default)
+    {
+        return PostJsonAsync("/api/v1/runtime/enable", cancellationToken);
+    }
+
+    public Task<JsonDocument> ReloadConfigurationAsync(CancellationToken cancellationToken = default)
+    {
+        return PostJsonAsync("/api/v1/config/reload", cancellationToken);
+    }
+
     public Task<JsonDocument> WaitForStatusAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
     {
         return WaitForJsonAsync(GetStatusAsync, timeout, cancellationToken);

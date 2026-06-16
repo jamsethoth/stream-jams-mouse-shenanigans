@@ -8,6 +8,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly IDiagnosticRecorder diagnosticRecorder;
     private readonly AbsoluteCursorRemappingCoordinator runtime;
     private readonly RuntimeCommandController runtimeCommandController;
+    private readonly ForegroundAllowlistConfirmationController foregroundAllowlistConfirmationController;
+    private readonly TrayForegroundAllowlistConfirmationPresenter foregroundAllowlistConfirmationPresenter;
     private readonly ToolStripMenuItem statusItem;
     private readonly ToolStripMenuItem hotkeyStatusItem;
     private readonly ToolStripMenuItem enableItem;
@@ -24,6 +26,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly TrayHotkeyReceiver hotkeyReceiver;
     private readonly LocalControlHost localControlHost;
     private readonly TrayShutdownController shutdownController;
+    private readonly ApplicationSafetySentinel safetySentinel;
+    private readonly System.Windows.Forms.Timer safetySentinelTimer;
     private readonly NotifyIcon notifyIcon;
     private bool disposed;
 
@@ -38,11 +42,18 @@ internal sealed class TrayApplicationContext : ApplicationContext
         diagnosticRecorder = CreateDiagnosticRecorder(this.startupOptions);
         RecordStartupValidationMessages(this.startupOptions, diagnosticRecorder);
         runtimeConfigurationController = CreateRuntimeConfigurationController(this.startupOptions, diagnosticRecorder);
+        TargetWindowReader targetWindowReader = new();
+        foregroundAllowlistConfirmationController = new ForegroundAllowlistConfirmationController(
+            runtimeConfigurationController,
+            targetWindowReader);
         runtime = CreateRuntime(runtimeConfigurationController.Current.CreateRuntimeOptions());
         runtimeCommandController = new RuntimeCommandController(
             runtime,
             runtimeConfigurationController,
-            new TargetWindowReader());
+            targetWindowReader,
+            enableApplicationSafety: true,
+            foregroundAllowlistConfirmationController: foregroundAllowlistConfirmationController,
+            diagnosticRecorder: diagnosticRecorder);
         statusItem = new ToolStripMenuItem { Enabled = false };
         hotkeyStatusItem = new ToolStripMenuItem { Enabled = false };
         enableItem = new ToolStripMenuItem("Enable remapping");
@@ -63,6 +74,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
             runtimeConfigurationController,
             new ExplorerConfigurationFolderLauncher(),
             UpdateRuntimeStatus);
+        foregroundAllowlistConfirmationPresenter = new TrayForegroundAllowlistConfirmationPresenter(
+            foregroundAllowlistConfirmationController,
+            UpdateRuntimeStatus);
 
         enableItem.Click += (_, _) =>
         {
@@ -80,13 +94,15 @@ internal sealed class TrayApplicationContext : ApplicationContext
         hotkeyController = new TrayHotkeyController(
             new WindowsHotkeyRegistrar(),
             runtimeCommandController,
-            UpdateRuntimeStatus);
+            UpdateRuntimeStatus,
+            foregroundAllowlistConfirmationPresenter.ShowConfirmation);
         hotkeyReceiver = new TrayHotkeyReceiver(hotkeyController.DispatchHotkey);
         localControlHost = CreateLocalControlHost(
             runtimeCommandController,
             UpdateRuntimeStatus,
             this.startupOptions,
-            diagnosticRecorder);
+            diagnosticRecorder,
+            foregroundAllowlistConfirmationPresenter.ShowConfirmation);
         shutdownController = new TrayShutdownController(
             runtime,
             HideNotifyIcon,
@@ -95,6 +111,22 @@ internal sealed class TrayApplicationContext : ApplicationContext
             localControlHost,
             forceExit: static () => Environment.Exit(0),
             forceExitDelay: TimeSpan.FromSeconds(5));
+        safetySentinel = new ApplicationSafetySentinel(
+            () => runtimeConfigurationController.Current,
+            new ProcessSnapshotReader(),
+            runtimeCommandController.EmergencyDisable,
+            () => shutdownController.RequestExit(),
+            isRuntimeEnabled: () => runtime.Status.State == RuntimeRemappingState.Enabled,
+            diagnosticRecorder: diagnosticRecorder);
+        safetySentinelTimer = new System.Windows.Forms.Timer
+        {
+            Interval = (int)this.startupOptions.SelfExitSentinelInterval.TotalMilliseconds,
+        };
+        safetySentinelTimer.Tick += (_, _) =>
+        {
+            safetySentinel.EvaluateOnce();
+            UpdateRuntimeStatus();
+        };
 
         notifyIcon = new NotifyIcon
         {
@@ -104,6 +136,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         };
 
         localControlHost.Start();
+        safetySentinelTimer.Start();
         hotkeyController.Register(
             hotkeyReceiver.WindowHandle,
             DefaultRuntimeHotkeyBindingProvider.Instance.GetBindings());
@@ -119,6 +152,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         if (disposing)
         {
+            safetySentinelTimer.Dispose();
             localControlHost.Dispose();
             hotkeyController.Dispose();
             hotkeyReceiver.Dispose();
@@ -164,7 +198,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
             runtimeConfigurationController.Current,
             runtimeConfigurationController.StatusMessage,
             localControlHost.Status.Message,
-            startupOptions.ValidationMessage);
+            startupOptions.ValidationMessage,
+            runtimeCommandController.ApplicationSafetyStatusMessage,
+            safetySentinel.StatusMessage);
         hotkeyStatusItem.Text = TrayStatusFormatter.CreateHotkeyStatusText(
             hotkeyController.RegistrationResult,
             hotkeyController.LastDispatchedCommand,
@@ -184,6 +220,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private void DisposeExitResources()
     {
+        safetySentinelTimer.Stop();
+        safetySentinelTimer.Dispose();
         hotkeyController.Dispose();
         hotkeyReceiver.Dispose();
     }
@@ -220,7 +258,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         RuntimeCommandController commandController,
         Action refreshStatus,
         TrayStartupOptions startupOptions,
-        IDiagnosticRecorder diagnosticRecorder)
+        IDiagnosticRecorder diagnosticRecorder,
+        Action<ForegroundAllowlistConfirmationRequest> requestForegroundAllowlistConfirmationPrompt)
     {
         SynchronizationContext? synchronizationContext = SynchronizationContext.Current;
         var handler = new LocalControlEndpointHandler(
@@ -228,7 +267,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
             diagnosticRecorder,
             getDegradedStatusMessage: () => startupOptions.ValidationMessage,
             requestStatusRefresh: () => RunOnSynchronizationContext(synchronizationContext, refreshStatus),
-            runRequestOnControlThread: operation => RunOnSynchronizationContext(synchronizationContext, operation));
+            runRequestOnControlThread: operation => RunOnSynchronizationContext(synchronizationContext, operation),
+            requestForegroundAllowlistConfirmationPrompt: request =>
+                PostOnSynchronizationContext(
+                    synchronizationContext,
+                    () => requestForegroundAllowlistConfirmationPrompt(request)));
 
         return new LocalControlHost(
             startupOptions.LocalControlOptions ?? LocalControlOptions.Default,
@@ -262,6 +305,17 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 action();
                 return true;
             });
+    }
+
+    private static void PostOnSynchronizationContext(SynchronizationContext? synchronizationContext, Action action)
+    {
+        if (synchronizationContext is null)
+        {
+            _ = Task.Run(action);
+            return;
+        }
+
+        synchronizationContext.Post(_ => action(), null);
     }
 
     private static T RunOnSynchronizationContext<T>(

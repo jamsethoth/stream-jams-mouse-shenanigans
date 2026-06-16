@@ -35,7 +35,8 @@ public sealed class TargetWindowReader : ITargetWindowReader
         return new TargetWindowInfo(
             ReadProcessName(windowHandle),
             ReadWindowTitle(windowHandle),
-            ReadWindowBounds(windowHandle));
+            ReadWindowBounds(windowHandle),
+            ReadExecutablePath(windowHandle));
     }
 
     private static IntPtr NormalizeWindowHandle(IntPtr windowHandle)
@@ -63,6 +64,38 @@ public sealed class TargetWindowReader : ITargetWindowReader
             return null;
         }
         catch (InvalidOperationException)
+        {
+            return null;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
+    }
+
+    private static string? ReadExecutablePath(IntPtr windowHandle)
+    {
+        _ = NativeMethods.GetWindowThreadProcessId(windowHandle, out uint processId);
+
+        if (processId == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            using Process process = Process.GetProcessById((int)processId);
+            return process.MainModule?.FileName;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
         {
             return null;
         }

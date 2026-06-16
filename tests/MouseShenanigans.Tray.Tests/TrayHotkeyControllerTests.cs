@@ -49,6 +49,45 @@ public sealed class TrayHotkeyControllerTests
     }
 
     [Fact]
+    public void DispatchAllowedApplicationCaptureHotkeyRequestsConfirmationPrompt()
+    {
+        RuntimeConfiguration configuration = RuntimeProofOfConceptDefaults.CreateConfiguration();
+        var store = new RecordingConfigurationStore(configuration);
+        var configurationController = new RuntimeConfigurationController(
+            store,
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var targetReader = new StubTargetWindowReader(new TargetWindowSnapshot(
+            foregroundWindow: new TargetWindowInfo("notepad", "Untitled - Notepad"),
+            windowUnderCursor: null));
+        var confirmationController = new ForegroundAllowlistConfirmationController(configurationController, targetReader);
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Disabled);
+        var registrar = new RecordingHotkeyRegistrar
+        {
+            ResolvedCommands = { [77] = RuntimeCommand.CaptureForegroundAllowedApplication },
+        };
+        List<ForegroundAllowlistConfirmationRequest> promptRequests = [];
+        var controller = new TrayHotkeyController(
+            registrar,
+            new RuntimeCommandController(
+                runtime,
+                configurationController,
+                targetReader,
+                foregroundAllowlistConfirmationController: confirmationController),
+            () => { },
+            promptRequests.Add);
+
+        bool handled = controller.DispatchHotkey(77);
+
+        Assert.True(handled);
+        Assert.Single(promptRequests);
+        Assert.Equal("notepad", promptRequests.Single().Identity.ProcessName);
+        Assert.Empty(configurationController.Current.Safety.AllowedApplications);
+        Assert.Empty(store.SavedConfigurations);
+        Assert.Equal(0, runtime.EnableRequests);
+        Assert.Equal(RuntimeCommand.CaptureForegroundAllowedApplication, controller.LastDispatchedCommand);
+    }
+
+    [Fact]
     public void RegisterStoresDegradedRegistrationStatus()
     {
         var registrar = new RecordingHotkeyRegistrar
@@ -159,6 +198,36 @@ public sealed class TrayHotkeyControllerTests
 
         public void Dispose()
         {
+        }
+    }
+
+    private sealed class RecordingConfigurationStore(RuntimeConfiguration initialConfiguration) : IRuntimeConfigurationStore
+    {
+        public string ConfigurationPath => "config.json";
+
+        public List<RuntimeConfiguration> SavedConfigurations { get; } = [];
+
+        public RuntimeConfigurationLoadResult LoadOrFallback(RuntimeConfiguration fallbackConfiguration)
+        {
+            return new RuntimeConfigurationLoadResult(initialConfiguration, UsedFallback: false, ErrorMessage: null);
+        }
+
+        public RuntimeConfiguration LoadRequired()
+        {
+            return initialConfiguration;
+        }
+
+        public void Save(RuntimeConfiguration configuration)
+        {
+            SavedConfigurations.Add(configuration);
+        }
+    }
+
+    private sealed class StubTargetWindowReader(TargetWindowSnapshot snapshot) : ITargetWindowReader
+    {
+        public TargetWindowSnapshot ReadSnapshot()
+        {
+            return snapshot;
         }
     }
 }

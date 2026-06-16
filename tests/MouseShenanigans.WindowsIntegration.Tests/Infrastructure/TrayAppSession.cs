@@ -7,6 +7,8 @@ namespace MouseShenanigans.WindowsIntegration.Tests.Infrastructure;
 
 internal sealed class TrayAppSession : IAsyncDisposable
 {
+    private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
+
     private readonly Process process;
     private readonly ProcessOutputBuffer outputBuffer;
     private readonly TemporaryDirectory rootDirectory;
@@ -31,13 +33,18 @@ internal sealed class TrayAppSession : IAsyncDisposable
 
     public bool HasExited => process.HasExited;
 
-    public static TrayAppSession Start(PublishedApplication application)
+    public static TrayAppSession Start(PublishedApplication application, string? configurationJson = null)
     {
         ArgumentNullException.ThrowIfNull(application);
 
         TemporaryDirectory rootDirectory = TemporaryDirectory.Create("tray-session");
         using ReservedLoopbackPort port = ReservedLoopbackPort.Reserve();
         TrayAppLaunchOptions launchOptions = TrayAppLaunchOptions.Create(rootDirectory.DirectoryPath, port.BaseUri);
+        if (configurationJson is not null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(launchOptions.ConfigurationPath)!);
+            File.WriteAllText(launchOptions.ConfigurationPath, configurationJson, Utf8NoBom);
+        }
 
         var process = new Process();
         process.StartInfo = new ProcessStartInfo
@@ -61,6 +68,22 @@ internal sealed class TrayAppSession : IAsyncDisposable
         var outputBuffer = new ProcessOutputBuffer();
         outputBuffer.Attach(process);
         return new TrayAppSession(process, outputBuffer, rootDirectory, launchOptions);
+    }
+
+    public async Task WaitForExitAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        using var timeoutCancellation = new CancellationTokenSource(timeout);
+        using CancellationTokenSource linkedCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCancellation.Token);
+
+        try
+        {
+            await process.WaitForExitAsync(linkedCancellation.Token);
+        }
+        catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Tray process did not exit within {timeout}.");
+        }
     }
 
     public async Task<string> CreateFailureContextAsync()

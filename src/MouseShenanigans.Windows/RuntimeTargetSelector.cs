@@ -2,20 +2,23 @@ namespace MouseShenanigans.Windows;
 
 public sealed class RuntimeTargetSelector
 {
-    private RuntimeTargetSelector(string? processName, string? windowTitleContains)
+    private RuntimeTargetSelector(string? processName, string? executablePath, string? windowTitleContains)
     {
         ProcessName = NormalizeProcessName(processName);
+        ExecutablePath = NormalizeExecutablePath(executablePath);
         WindowTitleContains = string.IsNullOrWhiteSpace(windowTitleContains)
             ? null
             : windowTitleContains.Trim();
 
-        if (ProcessName is null && WindowTitleContains is null)
+        if (ProcessName is null && ExecutablePath is null && WindowTitleContains is null)
         {
-            throw new ArgumentException("A runtime target must include a process name or window title match.");
+            throw new ArgumentException("A runtime target must include a process name, executable path, or window title match.");
         }
     }
 
     public string? ProcessName { get; }
+
+    public string? ExecutablePath { get; }
 
     public string? WindowTitleContains { get; }
 
@@ -26,7 +29,14 @@ public sealed class RuntimeTargetSelector
             throw new ArgumentException("Target process name must not be empty.", nameof(processName));
         }
 
-        return new RuntimeTargetSelector(processName, windowTitleContains: null);
+        return new RuntimeTargetSelector(processName, executablePath: null, windowTitleContains: null);
+    }
+
+    public static RuntimeTargetSelector ForApplicationIdentity(ApplicationIdentity identity)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+
+        return new RuntimeTargetSelector(identity.ProcessName, identity.ExecutablePath, identity.WindowTitleContains);
     }
 
     public static RuntimeTargetSelector ForWindowTitleContains(string windowTitleContains)
@@ -36,12 +46,17 @@ public sealed class RuntimeTargetSelector
             throw new ArgumentException("Target window title text must not be empty.", nameof(windowTitleContains));
         }
 
-        return new RuntimeTargetSelector(processName: null, windowTitleContains);
+        return new RuntimeTargetSelector(processName: null, executablePath: null, windowTitleContains);
     }
 
     public static RuntimeTargetSelector Create(string? processName, string? windowTitleContains)
     {
-        return new RuntimeTargetSelector(processName, windowTitleContains);
+        return Create(processName, executablePath: null, windowTitleContains);
+    }
+
+    public static RuntimeTargetSelector Create(string? processName, string? executablePath, string? windowTitleContains)
+    {
+        return new RuntimeTargetSelector(processName, executablePath, windowTitleContains);
     }
 
     public RuntimeTargetEligibility Evaluate(TargetWindowSnapshot snapshot)
@@ -111,6 +126,16 @@ public sealed class RuntimeTargetSelector
         if (ProcessName is not null
             && string.Equals(NormalizeProcessName(window.ProcessName), ProcessName, StringComparison.OrdinalIgnoreCase))
         {
+            if (ExecutablePath is null || string.Equals(window.ExecutablePath, ExecutablePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        if (ProcessName is null
+            && ExecutablePath is not null
+            && string.Equals(window.ExecutablePath, ExecutablePath, StringComparison.OrdinalIgnoreCase))
+        {
             return true;
         }
 
@@ -130,5 +155,10 @@ public sealed class RuntimeTargetSelector
         return trimmed.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
             ? trimmed[..^4]
             : trimmed;
+    }
+
+    private static string? NormalizeExecutablePath(string? executablePath)
+    {
+        return ApplicationIdentity.NormalizeExecutablePath(executablePath);
     }
 }
