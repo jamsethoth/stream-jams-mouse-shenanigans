@@ -37,6 +37,16 @@ internal sealed class LocalControlClient : IDisposable
         return PostJsonAsync("/api/v1/runtime/enable", cancellationToken);
     }
 
+    public Task<JsonDocument> DisableRuntimeAsync(CancellationToken cancellationToken = default)
+    {
+        return PostJsonAsync("/api/v1/runtime/disable", cancellationToken);
+    }
+
+    public Task<JsonDocument> EmergencyDisableRuntimeAsync(CancellationToken cancellationToken = default)
+    {
+        return PostJsonAsync("/api/v1/runtime/emergency-disable", cancellationToken);
+    }
+
     public Task<JsonDocument> ReloadConfigurationAsync(CancellationToken cancellationToken = default)
     {
         return PostJsonAsync("/api/v1/config/reload", cancellationToken);

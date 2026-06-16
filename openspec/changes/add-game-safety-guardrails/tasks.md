@@ -73,10 +73,10 @@
 
 ## 9. Manual Windows Validation
 
-- [ ] 9.1 Start with no game allowlist entries and verify a game target enable attempt is blocked before mouse observation starts.
-- [ ] 9.2 Add a test game process to the local allowlist and verify enabling succeeds only for the matching process identity.
-- [ ] 9.3 Launch a non-allowlisted game candidate while runtime is enabled and verify MouseShenanigans disables, releases cursor lock, unregisters mouse observation, logs the reason, and exits itself.
-- [ ] 9.4 Launch a protected-game denylisted process while runtime is disabled and verify MouseShenanigans exits itself without touching the game process.
-- [ ] 9.5 Verify tray and hotkey enable paths both fail closed when safety denies enablement.
-- [ ] 9.6 Verify emergency disable still works while safety is denying enablement.
-- [ ] 9.7 Inspect the implementation and release artifact to confirm no drivers, services, elevated input layers, game-process injection, overlays, game memory reads, anti-cheat tampering, concealment obfuscation, or stealth behavior were added.
+- [x] 9.1 Start with no game allowlist entries and verify a game target enable attempt is blocked before mouse observation starts. (Automated by the local-control integration suite.)
+- [x] 9.2 Add a test game process to the local allowlist and verify enabling succeeds only for the matching process identity. (Automated by desktop-gated fixture tests.)
+- [x] 9.3 Launch a non-allowlisted game candidate while runtime is enabled and verify MouseShenanigans disables, releases cursor lock, unregisters mouse observation, logs the reason, and exits itself. (Automated by desktop-gated fixture tests.)
+- [x] 9.4 Launch a protected-game denylisted process while runtime is disabled and verify MouseShenanigans exits itself without touching the game process. (Automated by the local-control integration suite.)
+- [x] 9.5 Verify tray and hotkey enable paths both fail closed when safety denies enablement. (Automated through the shared tray/local-control enable boundary plus desktop-gated hotkey dispatch.)
+- [x] 9.6 Verify emergency disable still works while safety is denying enablement. (Automated by the local-control integration suite.)
+- [x] 9.7 Inspect the implementation and release artifact to confirm no drivers, services, elevated input layers, game-process injection, overlays, game memory reads, anti-cheat tampering, concealment obfuscation, or stealth behavior were added. (Automated by the non-evasive scan.)

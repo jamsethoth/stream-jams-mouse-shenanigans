@@ -115,6 +115,71 @@ public sealed class PublishedTrayLocalControlTests(PublishedTrayApplicationFixtu
     [WindowsIntegrationFact]
     [Trait("Category", IntegrationTestCategories.WindowsIntegration)]
     [Trait("Category", IntegrationTestCategories.NonDesktop)]
+    public async Task AllowlistRequiresMatchingProcessIdentityThroughLocalControl()
+    {
+        await using TrayAppSession session = StartTraySession(CreateConfigurationJson(
+            "TargetGame",
+            """
+            {
+              "allowlistedGames": [
+                { "label": "Other fixture", "processName": "OtherGame" }
+              ],
+              "protectedGameDenyRules": [],
+              "gameLibraryRoots": [],
+              "gameProcessPatterns": [ "TargetGame" ]
+            }
+            """));
+        await WaitForStatusAsync(session);
+
+        using JsonDocument response = await session.Client.EnableRuntimeAsync();
+        using JsonDocument diagnostics = await session.Client.GetDiagnosticsAsync();
+
+        Assert.Equal("disabled", response.RootElement.GetProperty("state").GetString());
+        Assert.Contains(
+            "not allowlisted",
+            response.RootElement.GetProperty("message").GetString(),
+            StringComparison.OrdinalIgnoreCase);
+        AssertDiagnostic(
+            diagnostics,
+            "safety-blocked-enable",
+            expectedProcessName: "TargetGame",
+            expectedRuleName: "TargetGame");
+    }
+
+    [WindowsIntegrationFact]
+    [Trait("Category", IntegrationTestCategories.WindowsIntegration)]
+    [Trait("Category", IntegrationTestCategories.NonDesktop)]
+    public async Task EmergencyDisableRemainsAvailableAfterSafetyDeniedEnable()
+    {
+        await using TrayAppSession session = StartTraySession(CreateConfigurationJson(
+            "TargetGame",
+            """
+            {
+              "allowlistedGames": [],
+              "protectedGameDenyRules": [],
+              "gameLibraryRoots": [],
+              "gameProcessPatterns": [ "TargetGame" ]
+            }
+            """));
+        await WaitForStatusAsync(session);
+
+        using JsonDocument denied = await session.Client.EnableRuntimeAsync();
+        using JsonDocument disabled = await session.Client.EmergencyDisableRuntimeAsync();
+        using JsonDocument diagnostics = await session.Client.GetDiagnosticsAsync();
+
+        Assert.Equal("disabled", denied.RootElement.GetProperty("state").GetString());
+        string? disabledState = disabled.RootElement.GetProperty("state").GetString();
+        Assert.True(disabledState is "disabled" or "unsupported", $"Unexpected state: {disabledState}");
+        AssertDiagnostic(
+            diagnostics,
+            "safety-blocked-enable",
+            expectedProcessName: "TargetGame",
+            expectedRuleName: "TargetGame");
+    }
+
+    [WindowsIntegrationFact]
+    [Trait("Category", IntegrationTestCategories.WindowsIntegration)]
+    [Trait("Category", IntegrationTestCategories.NonDesktop)]
     public async Task ProtectedProcessSelfExitLeavesMatchedProcessRunning()
     {
         using Process protectedProcess = StartProtectedProcess();
