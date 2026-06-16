@@ -3,11 +3,11 @@ schema: spec-driven
 context: |
   Project: Stream Jams Mouse Shenanigans.
   Purpose: Windows-only C#/.NET tray utility for toggling custom mouse movement remapping against a specific third-party application window.
-  Current stage: .NET app foundation is scaffolded; pure-core remapping profiles and tests are implemented, while Windows runtime mouse hooks, target-window gating, hotkeys, tray profile controls, profile file persistence, and local automation endpoints remain planned.
+  Current stage: .NET app foundation, core remapping profiles, Windows runtime remapping, target-window gating, global hotkeys, tray profile controls, profile file persistence, loopback HTTP local control, diagnostics, Windows integration validation seams, and game-safety guardrails are implemented.
   Initial target behavior: horizontal inversion.
   Broader behavior: named, persisted directional remapping profiles that can be switched at runtime.
   Streaming integration goal: expose a local control surface that Streamer.bot or another automation tool can invoke to enable, disable, toggle, switch profiles, reload profiles, or apply selected config changes.
-  MVP constraints: use standard Win32 APIs first, avoid driver-level implementation, support one target window/app, provide toggle and emergency-disable hotkeys, and show basic tray status.
+  MVP constraints: use standard Windows user-session APIs first, avoid driver-level implementation, support one target window/app by process name, executable path, or title text, provide toggle and emergency-disable hotkeys, and show tray/local-control status.
   Known risks: Raw Input, DirectInput, anti-cheat protections, elevation mismatches, and apps that capture or recenter the cursor may limit standard Win32 interception.
 
 rules:
