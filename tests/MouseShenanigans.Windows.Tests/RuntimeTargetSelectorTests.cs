@@ -85,4 +85,30 @@ public sealed class RuntimeTargetSelectorTests
 
         Assert.Equal(RuntimeTargetEligibilityState.NoMatch, eligibility.State);
     }
+
+    [Fact]
+    public void ProcessTargetWithExecutablePathRequiresMatchingPathWhenAvailable()
+    {
+        RuntimeTargetSelector selector = RuntimeTargetSelector.ForApplicationIdentity(
+            new ApplicationIdentity("TargetApp", @"C:\Apps\TargetApp.exe"));
+        var matchingSnapshot = new TargetWindowSnapshot(
+            foregroundWindow: new TargetWindowInfo(
+                processName: "TargetApp",
+                title: "Target App",
+                bounds: new ScreenRectangle(left: 10, top: 10, right: 110, bottom: 110),
+                executablePath: @"C:\Apps\TargetApp.exe"),
+            windowUnderCursor: null,
+            cursorPosition: new ScreenPoint(50, 50));
+        var wrongPathSnapshot = new TargetWindowSnapshot(
+            foregroundWindow: new TargetWindowInfo(
+                processName: "TargetApp",
+                title: "Target App",
+                bounds: new ScreenRectangle(left: 10, top: 10, right: 110, bottom: 110),
+                executablePath: @"C:\Other\TargetApp.exe"),
+            windowUnderCursor: null,
+            cursorPosition: new ScreenPoint(50, 50));
+
+        Assert.True(selector.Evaluate(matchingSnapshot).IsEligibleForRemapping);
+        Assert.Equal(RuntimeTargetEligibilityState.NoMatch, selector.Evaluate(wrongPathSnapshot).State);
+    }
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using MouseShenanigans.WindowsIntegration.Tests.Infrastructure;
 
@@ -46,6 +47,175 @@ public sealed class PublishedTrayLocalControlTests(PublishedTrayApplicationFixtu
     [WindowsIntegrationFact]
     [Trait("Category", IntegrationTestCategories.WindowsIntegration)]
     [Trait("Category", IntegrationTestCategories.NonDesktop)]
+    public async Task EmptyGameAllowlistDeniesEnableThroughLocalControl()
+    {
+        await using TrayAppSession session = StartTraySession(CreateConfigurationJson(
+            "TargetGame",
+            """
+            {
+              "allowlistedGames": [],
+              "protectedGameDenyRules": [],
+              "gameLibraryRoots": [],
+              "gameProcessPatterns": [ "TargetGame" ]
+            }
+            """));
+        await WaitForStatusAsync(session);
+
+        using JsonDocument response = await session.Client.EnableRuntimeAsync();
+        using JsonDocument diagnostics = await session.Client.GetDiagnosticsAsync();
+
+        Assert.Equal("disabled", response.RootElement.GetProperty("state").GetString());
+        Assert.Contains(
+            "not allowlisted",
+            response.RootElement.GetProperty("message").GetString(),
+            StringComparison.OrdinalIgnoreCase);
+        AssertDiagnostic(
+            diagnostics,
+            "safety-blocked-enable",
+            expectedProcessName: "TargetGame",
+            expectedRuleName: "TargetGame");
+    }
+
+    [WindowsIntegrationFact]
+    [Trait("Category", IntegrationTestCategories.WindowsIntegration)]
+    [Trait("Category", IntegrationTestCategories.NonDesktop)]
+    public async Task ProtectedDenyRuleTakesPrecedenceThroughLocalControl()
+    {
+        await using TrayAppSession session = StartTraySession(CreateConfigurationJson(
+            "TargetGame",
+            """
+            {
+              "allowlistedGames": [
+                { "label": "User fixture", "processName": "TargetGame" }
+              ],
+              "protectedGameDenyRules": [
+                { "label": "Protected fixture", "processName": "TargetGame" }
+              ],
+              "gameLibraryRoots": [],
+              "gameProcessPatterns": [ "TargetGame" ]
+            }
+            """));
+        await WaitForStatusAsync(session);
+
+        using JsonDocument response = await session.Client.EnableRuntimeAsync();
+        using JsonDocument diagnostics = await session.Client.GetDiagnosticsAsync();
+
+        Assert.Equal("disabled", response.RootElement.GetProperty("state").GetString());
+        Assert.Contains(
+            "Protected fixture",
+            response.RootElement.GetProperty("message").GetString(),
+            StringComparison.Ordinal);
+        AssertDiagnostic(
+            diagnostics,
+            "safety-blocked-enable",
+            expectedProcessName: "TargetGame",
+            expectedRuleName: "Protected fixture");
+    }
+
+    [WindowsIntegrationFact]
+    [Trait("Category", IntegrationTestCategories.WindowsIntegration)]
+    [Trait("Category", IntegrationTestCategories.NonDesktop)]
+    public async Task AllowlistRequiresMatchingProcessIdentityThroughLocalControl()
+    {
+        await using TrayAppSession session = StartTraySession(CreateConfigurationJson(
+            "TargetGame",
+            """
+            {
+              "allowlistedGames": [
+                { "label": "Other fixture", "processName": "OtherGame" }
+              ],
+              "protectedGameDenyRules": [],
+              "gameLibraryRoots": [],
+              "gameProcessPatterns": [ "TargetGame" ]
+            }
+            """));
+        await WaitForStatusAsync(session);
+
+        using JsonDocument response = await session.Client.EnableRuntimeAsync();
+        using JsonDocument diagnostics = await session.Client.GetDiagnosticsAsync();
+
+        Assert.Equal("disabled", response.RootElement.GetProperty("state").GetString());
+        Assert.Contains(
+            "not allowlisted",
+            response.RootElement.GetProperty("message").GetString(),
+            StringComparison.OrdinalIgnoreCase);
+        AssertDiagnostic(
+            diagnostics,
+            "safety-blocked-enable",
+            expectedProcessName: "TargetGame",
+            expectedRuleName: "TargetGame");
+    }
+
+    [WindowsIntegrationFact]
+    [Trait("Category", IntegrationTestCategories.WindowsIntegration)]
+    [Trait("Category", IntegrationTestCategories.NonDesktop)]
+    public async Task EmergencyDisableRemainsAvailableAfterSafetyDeniedEnable()
+    {
+        await using TrayAppSession session = StartTraySession(CreateConfigurationJson(
+            "TargetGame",
+            """
+            {
+              "allowlistedGames": [],
+              "protectedGameDenyRules": [],
+              "gameLibraryRoots": [],
+              "gameProcessPatterns": [ "TargetGame" ]
+            }
+            """));
+        await WaitForStatusAsync(session);
+
+        using JsonDocument denied = await session.Client.EnableRuntimeAsync();
+        using JsonDocument disabled = await session.Client.EmergencyDisableRuntimeAsync();
+        using JsonDocument diagnostics = await session.Client.GetDiagnosticsAsync();
+
+        Assert.Equal("disabled", denied.RootElement.GetProperty("state").GetString());
+        string? disabledState = disabled.RootElement.GetProperty("state").GetString();
+        Assert.True(disabledState is "disabled" or "unsupported", $"Unexpected state: {disabledState}");
+        AssertDiagnostic(
+            diagnostics,
+            "safety-blocked-enable",
+            expectedProcessName: "TargetGame",
+            expectedRuleName: "TargetGame");
+    }
+
+    [WindowsIntegrationFact]
+    [Trait("Category", IntegrationTestCategories.WindowsIntegration)]
+    [Trait("Category", IntegrationTestCategories.NonDesktop)]
+    public async Task ProtectedProcessSelfExitLeavesMatchedProcessRunning()
+    {
+        using Process protectedProcess = StartProtectedProcess();
+        try
+        {
+            await using TrayAppSession session = StartTraySession(CreateConfigurationJson(
+                "Streamer.bot",
+                $$"""
+                {
+                  "allowlistedGames": [],
+                  "protectedGameDenyRules": [
+                    { "label": "Protected command fixture", "processName": "{{protectedProcess.ProcessName}}" }
+                  ],
+                  "gameLibraryRoots": [],
+                  "gameProcessPatterns": []
+                }
+                """));
+
+            await session.WaitForExitAsync(ReadyTimeout);
+
+            Assert.False(protectedProcess.HasExited, await session.CreateFailureContextAsync());
+            string diagnostics = File.Exists(session.LaunchOptions.DiagnosticsPath)
+                ? File.ReadAllText(session.LaunchOptions.DiagnosticsPath)
+                : string.Empty;
+            Assert.Contains("self-exit-requested", diagnostics, StringComparison.Ordinal);
+            Assert.Contains("Protected command fixture", diagnostics, StringComparison.Ordinal);
+        }
+        finally
+        {
+            StopProcess(protectedProcess);
+        }
+    }
+
+    [WindowsIntegrationFact]
+    [Trait("Category", IntegrationTestCategories.WindowsIntegration)]
+    [Trait("Category", IntegrationTestCategories.NonDesktop)]
     public async Task FailureContextIncludesProcessOutputDiagnosticsAndConfigPath()
     {
         await using TrayAppSession session = StartTraySession();
@@ -59,9 +229,11 @@ public sealed class PublishedTrayLocalControlTests(PublishedTrayApplicationFixtu
         Assert.Contains(session.LaunchOptions.ConfigurationPath, context, StringComparison.Ordinal);
     }
 
-    private TrayAppSession StartTraySession()
+    private TrayAppSession StartTraySession(string? configurationJson = null)
     {
-        return TrayAppSession.Start(fixture.Application ?? throw new InvalidOperationException("Tray app was not published."));
+        return TrayAppSession.Start(
+            fixture.Application ?? throw new InvalidOperationException("Tray app was not published."),
+            configurationJson);
     }
 
     private static async Task<JsonDocument> WaitForStatusAsync(TrayAppSession session)
@@ -73,6 +245,98 @@ public sealed class PublishedTrayLocalControlTests(PublishedTrayApplicationFixtu
         catch (Exception exception) when (exception is HttpRequestException or TimeoutException or TaskCanceledException)
         {
             throw new InvalidOperationException(await session.CreateFailureContextAsync(), exception);
+        }
+    }
+
+    private static string CreateConfigurationJson(string targetProcessName, string safetyJson)
+    {
+        return $$"""
+            {
+              "target": { "processName": "{{targetProcessName}}.exe" },
+              "activeProfile": "horizontal-inversion",
+              "cursorLockEnabled": true,
+              "profiles": [
+                {
+                  "name": "horizontal-inversion",
+                  "left": { "x": 1, "y": 0 },
+                  "right": { "x": -1, "y": 0 },
+                  "up": { "x": 0, "y": -1 },
+                  "down": { "x": 0, "y": 1 }
+                }
+              ],
+              "safety": {{safetyJson}}
+            }
+            """;
+    }
+
+    private static void AssertDiagnostic(
+        JsonDocument diagnostics,
+        string expectedType,
+        string expectedProcessName,
+        string expectedRuleName)
+    {
+        foreach (JsonElement diagnosticEvent in diagnostics.RootElement.GetProperty("events").EnumerateArray())
+        {
+            if (diagnosticEvent.GetProperty("type").GetString() != expectedType)
+            {
+                continue;
+            }
+
+            JsonElement capturedIdentity = diagnosticEvent.GetProperty("capturedIdentity");
+            if (capturedIdentity.ValueKind == JsonValueKind.Null)
+            {
+                continue;
+            }
+
+            if (capturedIdentity.GetProperty("processName").GetString() == expectedProcessName
+                && capturedIdentity.GetProperty("ruleName").GetString()?.Contains(
+                    expectedRuleName,
+                    StringComparison.Ordinal) == true)
+            {
+                return;
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Expected diagnostic '{expectedType}' for '{expectedProcessName}' and rule '{expectedRuleName}'.");
+    }
+
+    private static Process StartProtectedProcess()
+    {
+        string commandProcessor = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe";
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = commandProcessor,
+                Arguments = "/c ping -n 30 127.0.0.1 > nul",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            },
+        };
+
+        if (!process.Start())
+        {
+            throw new InvalidOperationException("Protected process fixture did not start.");
+        }
+
+        return process;
+    }
+
+    private static void StopProcess(Process process)
+    {
+        if (process.HasExited)
+        {
+            return;
+        }
+
+        try
+        {
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit(5000);
+        }
+        catch (InvalidOperationException)
+        {
         }
     }
 }

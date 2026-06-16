@@ -17,6 +17,19 @@ public sealed record LocalControlProfilesResponse(
     IReadOnlyList<string> Profiles,
     string? Message);
 
+public sealed record LocalControlApplicationIdentityResponse(
+    string? ProcessName,
+    string? ExecutablePath,
+    string? WindowTitleContains,
+    string DisplayName);
+
+public sealed record LocalControlForegroundAllowlistCaptureResponse(
+    bool Ok,
+    string Status,
+    string ConfirmationId,
+    LocalControlApplicationIdentityResponse CapturedIdentity,
+    string? Message);
+
 public sealed record LocalControlErrorResponse(
     bool Ok,
     string Error,

@@ -6,12 +6,22 @@ internal static class KeyboardInput
 {
     public static void SendForegroundCaptureHotkey()
     {
+        SendControlAltHotkey(NativeMethods.VirtualKeyF9);
+    }
+
+    public static void SendToggleRuntimeHotkey()
+    {
+        SendControlAltHotkey(NativeMethods.VirtualKeyF8);
+    }
+
+    private static void SendControlAltHotkey(ushort virtualKey)
+    {
         NativeMethods.Input[] inputs =
         [
             KeyDown(NativeMethods.VirtualKeyControl),
             KeyDown(NativeMethods.VirtualKeyAlt),
-            KeyDown(NativeMethods.VirtualKeyF9),
-            KeyUp(NativeMethods.VirtualKeyF9),
+            KeyDown(virtualKey),
+            KeyUp(virtualKey),
             KeyUp(NativeMethods.VirtualKeyAlt),
             KeyUp(NativeMethods.VirtualKeyControl),
         ];

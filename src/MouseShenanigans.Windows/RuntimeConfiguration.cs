@@ -9,13 +9,15 @@ public sealed record RuntimeConfiguration
         string activeProfileName,
         bool cursorLockEnabled,
         RemappingProfileSet profiles,
-        IReadOnlyList<RemappingProfile> configuredProfiles)
+        IReadOnlyList<RemappingProfile> configuredProfiles,
+        ApplicationSafetyConfiguration safety)
     {
         TargetSelector = targetSelector;
         ActiveProfileName = activeProfileName;
         CursorLockEnabled = cursorLockEnabled;
         Profiles = profiles;
         ConfiguredProfiles = configuredProfiles.ToArray();
+        Safety = safety;
     }
 
     public RuntimeTargetSelector TargetSelector { get; }
@@ -27,6 +29,8 @@ public sealed record RuntimeConfiguration
     public RemappingProfileSet Profiles { get; }
 
     public IReadOnlyList<RemappingProfile> ConfiguredProfiles { get; }
+
+    public ApplicationSafetyConfiguration Safety { get; }
 
     public RemappingProfile ActiveProfile => Profiles.GetRequired(ActiveProfileName);
 
@@ -72,7 +76,8 @@ public sealed record RuntimeConfiguration
         RuntimeTargetSelector targetSelector,
         string activeProfileName,
         bool cursorLockEnabled,
-        IEnumerable<RemappingProfile> configuredProfiles)
+        IEnumerable<RemappingProfile> configuredProfiles,
+        ApplicationSafetyConfiguration? safety = null)
     {
         ArgumentNullException.ThrowIfNull(targetSelector);
         ArgumentNullException.ThrowIfNull(configuredProfiles);
@@ -93,17 +98,23 @@ public sealed record RuntimeConfiguration
             normalizedActiveProfileName,
             cursorLockEnabled,
             profiles,
-            configuredProfileArray);
+            configuredProfileArray,
+            safety ?? ApplicationSafetyConfiguration.Empty);
     }
 
     public RuntimeConfiguration WithActiveProfile(string activeProfileName)
     {
-        return CreateFromConfiguredProfiles(TargetSelector, activeProfileName, CursorLockEnabled, ConfiguredProfiles);
+        return CreateFromConfiguredProfiles(TargetSelector, activeProfileName, CursorLockEnabled, ConfiguredProfiles, Safety);
     }
 
     public RuntimeConfiguration WithTargetSelector(RuntimeTargetSelector targetSelector)
     {
-        return CreateFromConfiguredProfiles(targetSelector, ActiveProfileName, CursorLockEnabled, ConfiguredProfiles);
+        return CreateFromConfiguredProfiles(targetSelector, ActiveProfileName, CursorLockEnabled, ConfiguredProfiles, Safety);
+    }
+
+    public RuntimeConfiguration WithSafety(ApplicationSafetyConfiguration safety)
+    {
+        return CreateFromConfiguredProfiles(TargetSelector, ActiveProfileName, CursorLockEnabled, ConfiguredProfiles, safety);
     }
 
     public RuntimeRemappingOptions CreateRuntimeOptions()

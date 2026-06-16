@@ -14,6 +14,8 @@ internal static partial class NativeMethods
 
     public const ushort VirtualKeyAlt = 0x12;
 
+    public const ushort VirtualKeyF8 = 0x77;
+
     public const ushort VirtualKeyF9 = 0x78;
 
     [DllImport("user32.dll", SetLastError = true)]

@@ -153,6 +153,29 @@ public sealed class LocalControlEndpointHandlerTests
     }
 
     [Fact]
+    public void RuntimeEnableEndpointReportsApplicationSafetyDenial()
+    {
+        RuntimeConfiguration configuration = CreateConfiguration()
+            .WithSafety(new ApplicationSafetyConfiguration(gameProcessPatterns: ["TargetApp"]));
+        var configurationController = new RuntimeConfigurationController(
+            new RecordingConfigurationStore(configuration),
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Disabled);
+        var handler = new LocalControlEndpointHandler(new RuntimeCommandController(
+            runtime,
+            configurationController,
+            enableApplicationSafety: true));
+
+        LocalControlEndpointResult result = handler.Execute(RuntimeCommand.EnableRuntime);
+
+        Assert.Equal(200, result.StatusCode);
+        var response = Assert.IsType<LocalControlRuntimeSnapshotResponse>(result.Body);
+        Assert.Equal("disabled", response.State);
+        Assert.Equal(0, runtime.EnableRequests);
+        Assert.Contains("not allowlisted", response.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void DisableAndEmergencyDisableReleaseCursorLockThroughRuntime()
     {
         var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Enabled);
@@ -237,6 +260,95 @@ public sealed class LocalControlEndpointHandlerTests
         Assert.Equal(
             [DiagnosticEventTypes.ForegroundCaptureRequested, DiagnosticEventTypes.ForegroundCaptureFailed],
             recorder.Snapshot().Select(diagnosticEvent => diagnosticEvent.Type));
+    }
+
+    [Fact]
+    public void CaptureForegroundAllowedApplicationReturnsAcceptedPendingResponseImmediately()
+    {
+        RuntimeConfiguration configuration = CreateConfiguration();
+        var store = new RecordingConfigurationStore(configuration);
+        var configurationController = new RuntimeConfigurationController(
+            store,
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Disabled);
+        var targetReader = new StubTargetWindowReader(new TargetWindowSnapshot(
+            foregroundWindow: new TargetWindowInfo("notepad", "Untitled - Notepad"),
+            windowUnderCursor: null));
+        var confirmationController = new ForegroundAllowlistConfirmationController(configurationController, targetReader);
+        var promptRequests = new List<ForegroundAllowlistConfirmationRequest>();
+        var refreshRequests = 0;
+        var handler = new LocalControlEndpointHandler(
+            new RuntimeCommandController(
+                runtime,
+                configurationController,
+                targetReader,
+                foregroundAllowlistConfirmationController: confirmationController),
+            requestStatusRefresh: () => refreshRequests++,
+            requestForegroundAllowlistConfirmationPrompt: promptRequests.Add);
+
+        LocalControlEndpointResult result = handler.CaptureForegroundAllowedApplication();
+
+        Assert.Equal(202, result.StatusCode);
+        var response = Assert.IsType<LocalControlForegroundAllowlistCaptureResponse>(result.Body);
+        Assert.True(response.Ok);
+        Assert.Equal("confirmationPending", response.Status);
+        Assert.Equal("notepad", response.CapturedIdentity.ProcessName);
+        Assert.Single(promptRequests);
+        Assert.Empty(configurationController.Current.Safety.AllowedApplications);
+        Assert.Empty(store.SavedConfigurations);
+        Assert.Equal(1, refreshRequests);
+    }
+
+    [Fact]
+    public void CaptureForegroundAllowedApplicationFailureReturnsStableError()
+    {
+        RuntimeConfiguration configuration = CreateConfiguration();
+        var configurationController = new RuntimeConfigurationController(
+            new RecordingConfigurationStore(configuration),
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var targetReader = new StubTargetWindowReader(TargetWindowSnapshot.Empty);
+        var confirmationController = new ForegroundAllowlistConfirmationController(configurationController, targetReader);
+        var handler = new LocalControlEndpointHandler(
+            new RuntimeCommandController(
+                new RecordingRuntimeController(RuntimeRemappingStatus.Disabled),
+                configurationController,
+                targetReader,
+                foregroundAllowlistConfirmationController: confirmationController));
+
+        LocalControlEndpointResult result = handler.CaptureForegroundAllowedApplication();
+
+        Assert.Equal(400, result.StatusCode);
+        var response = Assert.IsType<LocalControlErrorResponse>(result.Body);
+        Assert.False(response.Ok);
+        Assert.Equal(LocalControlErrorCodes.ForegroundAllowlistCaptureFailed, response.Error);
+        Assert.Contains("no usable", response.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AcceptedForegroundAllowedApplicationConfirmationAppearsInLaterStatus()
+    {
+        RuntimeConfiguration configuration = CreateConfiguration();
+        var configurationController = new RuntimeConfigurationController(
+            new RecordingConfigurationStore(configuration),
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var targetReader = new StubTargetWindowReader(new TargetWindowSnapshot(
+            foregroundWindow: new TargetWindowInfo("notepad", "Untitled - Notepad"),
+            windowUnderCursor: null));
+        var confirmationController = new ForegroundAllowlistConfirmationController(configurationController, targetReader);
+        var commandController = new RuntimeCommandController(
+            new RecordingRuntimeController(RuntimeRemappingStatus.Disabled),
+            configurationController,
+            targetReader,
+            foregroundAllowlistConfirmationController: confirmationController);
+        var handler = new LocalControlEndpointHandler(commandController);
+        ForegroundAllowlistConfirmationRequest request =
+            commandController.CaptureForegroundAllowedApplication(ForegroundAllowlistConfirmationSource.LocalControl).Request!;
+
+        confirmationController.Confirm(request.Id);
+        LocalControlEndpointResult result = handler.GetStatus();
+
+        var response = Assert.IsType<LocalControlRuntimeSnapshotResponse>(result.Body);
+        Assert.Contains("accepted", response.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

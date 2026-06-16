@@ -66,6 +66,42 @@ public sealed class RuntimeConfigurationControllerTests
     }
 
     [Fact]
+    public void AddAllowedApplicationPersistsSafetyConfiguration()
+    {
+        RuntimeConfiguration configuration = CreateConfiguration();
+        var store = new RecordingConfigurationStore(configuration);
+        var controller = new RuntimeConfigurationController(store, RuntimeProofOfConceptDefaults.CreateConfiguration());
+
+        RuntimeConfigurationOperationResult result =
+            controller.AddAllowedApplication(new ApplicationIdentity("notepad"));
+
+        Assert.True(result.Succeeded);
+        Assert.Single(controller.Current.Safety.AllowedApplications);
+        Assert.Equal("notepad", store.SavedConfigurations.Single().Safety.AllowedApplications.Single().Identity.ProcessName);
+    }
+
+    [Fact]
+    public void AddAllowedApplicationDoesNotPersistDuplicate()
+    {
+        var safety = new ApplicationSafetyConfiguration(
+            allowedApplications:
+            [
+                new ApplicationSafetyEntry(new ApplicationIdentity("notepad")),
+            ]);
+        RuntimeConfiguration configuration = CreateConfiguration().WithSafety(safety);
+        var store = new RecordingConfigurationStore(configuration);
+        var controller = new RuntimeConfigurationController(store, RuntimeProofOfConceptDefaults.CreateConfiguration());
+
+        RuntimeConfigurationOperationResult result =
+            controller.AddAllowedApplication(new ApplicationIdentity("notepad.exe"));
+
+        Assert.True(result.Succeeded);
+        Assert.Single(controller.Current.Safety.AllowedApplications);
+        Assert.Empty(store.SavedConfigurations);
+        Assert.Contains("already includes", controller.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ReportOperationFailurePreservesCurrentConfiguration()
     {
         RuntimeConfiguration configuration = CreateConfiguration();

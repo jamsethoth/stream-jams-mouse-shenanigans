@@ -51,6 +51,95 @@ public sealed class RuntimeCommandControllerTests
     }
 
     [Fact]
+    public void EnableIsDeniedWhenConfiguredTargetIsNotAllowlisted()
+    {
+        RuntimeConfiguration configuration = RuntimeConfigurationControllerTests.CreateConfiguration()
+            .WithSafety(new ApplicationSafetyConfiguration(gameProcessPatterns: ["TargetApp"]));
+        var configurationController = new RuntimeConfigurationController(
+            new RecordingConfigurationStore(configuration),
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Disabled);
+        var controller = new RuntimeCommandController(
+            runtime,
+            configurationController,
+            enableApplicationSafety: true);
+
+        controller.Enable();
+
+        Assert.Equal(0, runtime.EnableRequests);
+        Assert.Equal(RuntimeRemappingState.Disabled, runtime.Status.State);
+        Assert.Contains("not allowlisted", controller.ApplicationSafetyStatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ToggleToEnableUsesApplicationSafetyGate()
+    {
+        RuntimeConfiguration configuration = RuntimeConfigurationControllerTests.CreateConfiguration()
+            .WithSafety(new ApplicationSafetyConfiguration(gameProcessPatterns: ["TargetApp"]));
+        var configurationController = new RuntimeConfigurationController(
+            new RecordingConfigurationStore(configuration),
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Disabled);
+        var controller = new RuntimeCommandController(
+            runtime,
+            configurationController,
+            enableApplicationSafety: true);
+
+        controller.Toggle();
+
+        Assert.Equal(0, runtime.EnableRequests);
+        Assert.Equal(RuntimeRemappingState.Disabled, runtime.Status.State);
+    }
+
+    [Fact]
+    public void EnableSucceedsWhenConfiguredTargetIsAllowlisted()
+    {
+        var safety = new ApplicationSafetyConfiguration(
+            allowedApplications:
+            [
+                new ApplicationSafetyEntry(new ApplicationIdentity("TargetApp")),
+            ]);
+        RuntimeConfiguration configuration = RuntimeConfigurationControllerTests.CreateConfiguration().WithSafety(safety);
+        var configurationController = new RuntimeConfigurationController(
+            new RecordingConfigurationStore(configuration),
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Disabled);
+        var controller = new RuntimeCommandController(
+            runtime,
+            configurationController,
+            enableApplicationSafety: true);
+
+        controller.Enable();
+
+        Assert.Equal(1, runtime.EnableRequests);
+        Assert.Equal(RuntimeRemappingState.Enabled, runtime.Status.State);
+        Assert.Contains("allowed target", controller.ApplicationSafetyStatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void EmergencyDisableBypassesApplicationSafetyGate()
+    {
+        RuntimeConfiguration configuration = RuntimeConfigurationControllerTests.CreateConfiguration()
+            .WithSafety(new ApplicationSafetyConfiguration(gameProcessPatterns: ["TargetApp"]));
+        var configurationController = new RuntimeConfigurationController(
+            new RecordingConfigurationStore(configuration),
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Enabled);
+        var recorder = new BoundedDiagnosticRecorder();
+        var controller = new RuntimeCommandController(
+            runtime,
+            configurationController,
+            enableApplicationSafety: true,
+            diagnosticRecorder: recorder);
+
+        controller.EmergencyDisable();
+
+        Assert.Equal(1, runtime.DisableRequests);
+        Assert.Equal(0, runtime.EnableRequests);
+        Assert.Empty(recorder.Snapshot());
+    }
+
+    [Fact]
     public void SelectProfilePersistsSelectionAndAppliesRuntimeOptions()
     {
         RuntimeConfiguration configuration = RuntimeConfigurationControllerTests.CreateConfiguration();
@@ -176,6 +265,35 @@ public sealed class RuntimeCommandControllerTests
         Assert.Empty(store.SavedConfigurations);
         Assert.Empty(runtime.AppliedOptions);
         Assert.Contains("Target capture failed", configurationController.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CaptureForegroundAllowedApplicationCreatesPendingConfirmationWithoutPersisting()
+    {
+        RuntimeConfiguration configuration = RuntimeConfigurationControllerTests.CreateConfiguration();
+        var store = new RecordingConfigurationStore(configuration);
+        var configurationController = new RuntimeConfigurationController(
+            store,
+            RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Disabled);
+        var targetReader = new StubTargetWindowReader(new TargetWindowSnapshot(
+            foregroundWindow: new TargetWindowInfo("notepad", "Untitled - Notepad"),
+            windowUnderCursor: null));
+        var confirmationController = new ForegroundAllowlistConfirmationController(configurationController, targetReader);
+        var controller = new RuntimeCommandController(
+            runtime,
+            configurationController,
+            targetReader,
+            foregroundAllowlistConfirmationController: confirmationController);
+
+        ForegroundAllowlistConfirmationRequestResult result =
+            controller.CaptureForegroundAllowedApplication(ForegroundAllowlistConfirmationSource.Hotkey);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("notepad", result.Request?.Identity.ProcessName);
+        Assert.Empty(configurationController.Current.Safety.AllowedApplications);
+        Assert.Empty(store.SavedConfigurations);
+        Assert.Contains("pending", controller.ApplicationSafetyStatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class RecordingRuntimeController(RuntimeRemappingStatus status) : IRuntimeRemappingController

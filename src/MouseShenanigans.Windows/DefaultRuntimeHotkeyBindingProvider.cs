@@ -26,6 +26,10 @@ public sealed class DefaultRuntimeHotkeyBindingProvider : IHotkeyBindingProvider
                 RuntimeCommand.CaptureForegroundTarget,
                 HotkeyModifiers.Control | HotkeyModifiers.Alt | HotkeyModifiers.NoRepeat,
                 Keys.F9),
+            new HotkeyBinding(
+                RuntimeCommand.CaptureForegroundAllowedApplication,
+                HotkeyModifiers.Control | HotkeyModifiers.Alt | HotkeyModifiers.Shift | HotkeyModifiers.NoRepeat,
+                Keys.F9),
         ];
     }
 }

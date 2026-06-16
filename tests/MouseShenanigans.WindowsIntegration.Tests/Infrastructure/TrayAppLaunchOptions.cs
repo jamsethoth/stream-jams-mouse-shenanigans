@@ -42,5 +42,6 @@ internal sealed class TrayAppLaunchOptions
         startInfo.Environment[TrayStartupOptions.RuntimeConfigurationPathEnvironmentVariable] = ConfigurationPath;
         startInfo.Environment[TrayStartupOptions.LocalControlUrlEnvironmentVariable] = LocalControlBaseUri.ToString();
         startInfo.Environment[TrayStartupOptions.DiagnosticsPathEnvironmentVariable] = DiagnosticsPath;
+        startInfo.Environment[TrayStartupOptions.SelfExitSentinelIntervalEnvironmentVariable] = "250";
     }
 }

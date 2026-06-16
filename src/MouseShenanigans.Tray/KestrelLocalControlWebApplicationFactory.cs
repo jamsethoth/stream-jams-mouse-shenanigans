@@ -36,6 +36,8 @@ public sealed class KestrelLocalControlWebApplicationFactory : ILocalControlWebA
         app.MapPost("/api/v1/runtime/toggle", () => ToHttpResult(handler.Execute(RuntimeCommand.ToggleRuntime)));
         app.MapPost("/api/v1/runtime/emergency-disable", () => ToHttpResult(handler.Execute(RuntimeCommand.EmergencyDisable)));
         app.MapPost("/api/v1/target/capture-foreground", () => ToHttpResult(handler.CaptureForegroundTarget()));
+        app.MapPost("/api/v1/safety/allowed-applications/capture-foreground", () =>
+            ToHttpResult(handler.CaptureForegroundAllowedApplication()));
         app.MapGet("/api/v1/profiles", () => ToHttpResult(handler.GetProfiles()));
         app.MapPost("/api/v1/profiles/select", async (HttpRequest request) =>
         {

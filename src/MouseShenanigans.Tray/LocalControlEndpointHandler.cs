@@ -9,19 +9,23 @@ public sealed class LocalControlEndpointHandler
     private readonly Func<string?> getDegradedStatusMessage;
     private readonly Action requestStatusRefresh;
     private readonly Func<Func<LocalControlEndpointResult>, LocalControlEndpointResult> runRequestOnControlThread;
+    private readonly Action<ForegroundAllowlistConfirmationRequest> requestForegroundAllowlistConfirmationPrompt;
 
     public LocalControlEndpointHandler(
         RuntimeCommandController commandController,
         IDiagnosticRecorder? diagnosticRecorder = null,
         Func<string?>? getDegradedStatusMessage = null,
         Action? requestStatusRefresh = null,
-        Func<Func<LocalControlEndpointResult>, LocalControlEndpointResult>? runRequestOnControlThread = null)
+        Func<Func<LocalControlEndpointResult>, LocalControlEndpointResult>? runRequestOnControlThread = null,
+        Action<ForegroundAllowlistConfirmationRequest>? requestForegroundAllowlistConfirmationPrompt = null)
     {
         this.commandController = commandController ?? throw new ArgumentNullException(nameof(commandController));
         this.diagnosticRecorder = diagnosticRecorder ?? NullDiagnosticRecorder.Instance;
         this.getDegradedStatusMessage = getDegradedStatusMessage ?? (() => null);
         this.requestStatusRefresh = requestStatusRefresh ?? (() => { });
         this.runRequestOnControlThread = runRequestOnControlThread ?? (operation => operation());
+        this.requestForegroundAllowlistConfirmationPrompt =
+            requestForegroundAllowlistConfirmationPrompt ?? (_ => { });
     }
 
     public LocalControlEndpointResult GetStatus()
@@ -62,6 +66,11 @@ public sealed class LocalControlEndpointHandler
     public LocalControlEndpointResult CaptureForegroundTarget()
     {
         return runRequestOnControlThread(CaptureForegroundTargetCore);
+    }
+
+    public LocalControlEndpointResult CaptureForegroundAllowedApplication()
+    {
+        return runRequestOnControlThread(CaptureForegroundAllowedApplicationCore);
     }
 
     public LocalControlEndpointResult SelectProfile(LocalControlSelectProfileRequest? request)
@@ -126,6 +135,39 @@ public sealed class LocalControlEndpointHandler
         catch (InvalidOperationException ex)
         {
             diagnosticRecorder.Record(DiagnosticEventTypes.ForegroundCaptureFailed, ex.Message);
+            return LocalControlEndpointResult.BadRequest(new LocalControlErrorResponse(
+                Ok: false,
+                Error: LocalControlErrorCodes.ConfigurationUnavailable,
+                Message: ex.Message));
+        }
+    }
+
+    private LocalControlEndpointResult CaptureForegroundAllowedApplicationCore()
+    {
+        try
+        {
+            ForegroundAllowlistConfirmationRequestResult result =
+                commandController.CaptureForegroundAllowedApplication(ForegroundAllowlistConfirmationSource.LocalControl);
+            requestStatusRefresh();
+
+            if (!result.Succeeded || result.Request is null)
+            {
+                return LocalControlEndpointResult.BadRequest(new LocalControlErrorResponse(
+                    Ok: false,
+                    Error: LocalControlErrorCodes.ForegroundAllowlistCaptureFailed,
+                    Message: result.Message));
+            }
+
+            requestForegroundAllowlistConfirmationPrompt(result.Request);
+            return LocalControlEndpointResult.Accepted(new LocalControlForegroundAllowlistCaptureResponse(
+                Ok: true,
+                Status: "confirmationPending",
+                ConfirmationId: result.Request.Id.ToString("D"),
+                CapturedIdentity: ToResponse(result.Request.Identity),
+                Message: result.Message));
+        }
+        catch (InvalidOperationException ex)
+        {
             return LocalControlEndpointResult.BadRequest(new LocalControlErrorResponse(
                 Ok: false,
                 Error: LocalControlErrorCodes.ConfigurationUnavailable,
@@ -213,6 +255,7 @@ public sealed class LocalControlEndpointHandler
         [
             commandController.RuntimeStatus.Message,
             commandController.ConfigurationStatusMessage,
+            commandController.ApplicationSafetyStatusMessage,
             getDegradedStatusMessage(),
         ];
 
@@ -229,5 +272,14 @@ public sealed class LocalControlEndpointHandler
     private static bool IsTargetCaptureFailure(string? message)
     {
         return message?.StartsWith("Target capture failed:", StringComparison.Ordinal) == true;
+    }
+
+    private static LocalControlApplicationIdentityResponse ToResponse(MouseShenanigans.Windows.ApplicationIdentity identity)
+    {
+        return new LocalControlApplicationIdentityResponse(
+            identity.ProcessName,
+            identity.ExecutablePath,
+            identity.WindowTitleContains,
+            identity.DisplayName);
     }
 }

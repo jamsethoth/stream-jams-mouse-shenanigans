@@ -46,6 +46,20 @@ public sealed class RuntimeConfigurationController
         return SaveCurrent(updatedConfiguration);
     }
 
+    public RuntimeConfigurationOperationResult AddAllowedApplication(ApplicationIdentity identity)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+
+        if (Current.Safety.HasAllowedApplication(identity))
+        {
+            StatusMessage = $"Application safety allowlist already includes '{identity.DisplayName}'.";
+            return new RuntimeConfigurationOperationResult(Current, Succeeded: true, StatusMessage);
+        }
+
+        RuntimeConfiguration updatedConfiguration = Current.WithSafety(Current.Safety.WithAllowedApplication(identity));
+        return SaveCurrent(updatedConfiguration);
+    }
+
     public RuntimeConfigurationOperationResult Reload()
     {
         try
