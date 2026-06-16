@@ -158,6 +158,29 @@ The same commands can be run from WSL through the official `mcr.microsoft.com/do
 
 When validating from WSL or another non-Windows environment, Windows-targeted project compilation relies on `EnableWindowsTargeting=true` from the shared build configuration. This validates compilation, analyzers, and non-desktop tests only.
 
+## Local Validation Seams
+
+The tray app has explicit local-only startup overrides for automated validation. They are not public remote API settings, and production defaults remain active when the variables are unset.
+
+| Environment variable | Purpose |
+| --- | --- |
+| `MOUSE_SHENANIGANS_CONFIG_PATH` | Fully qualified runtime configuration file path for an isolated validation run. |
+| `MOUSE_SHENANIGANS_LOCAL_CONTROL_URL` | Absolute HTTP loopback URL for the local-control listener, for example `http://127.0.0.1:6178`. |
+| `MOUSE_SHENANIGANS_DIAGNOSTICS_PATH` | Optional fully qualified JSONL diagnostics output path. Diagnostics are also exposed through local control. |
+| `MOUSE_SHENANIGANS_SELF_EXIT_SENTINEL_INTERVAL_MS` | Positive integer interval override, in milliseconds, for future self-exit sentinel validation. |
+
+Invalid overrides are reported through tray/local-control status and diagnostics. Invalid configuration-path overrides do not fall back to the user's production configuration path.
+
+Recent diagnostics are available from the loopback-only local-control endpoint:
+
+```text
+GET /api/v1/diagnostics
+```
+
+The response contains bounded recent events with stable `type`, `timestamp`, `message`, and optional `capturedIdentity` fields for validation assertions.
+
+The solution also includes `MouseShenanigans.TestWindowFixture`, a Windows-only fixture utility under `tests/`. It opens a normal visible window with a stable process name and default title, and it can write a readiness file when started with `--ready-file <path>`. It is a validation fixture only and is not included when publishing `src\MouseShenanigans.Tray\MouseShenanigans.Tray.csproj`.
+
 ## Manual Verification Boundary
 
 From WSL or Docker, stop at restore, format, build, and non-desktop tests. The Windows tray launch check must be performed manually in a real Windows desktop session.

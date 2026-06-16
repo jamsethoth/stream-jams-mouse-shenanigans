@@ -42,7 +42,7 @@ Alternative considered: relying only on trace output. Trace output is useful but
 
 ### Add a visible test-window fixture
 
-Create a small Windows test fixture app that opens a normal visible window with a stable title and process name, and can optionally remain alive after the tray exits. The fixture gives hotkey, foreground capture, allowlist, and self-exit tests a controlled third-party window without using real games or user applications.
+Create a small Windows test fixture app that opens a normal visible window with a stable title and process name, and can optionally remain alive after the tray exits. The fixture gives hotkey, foreground capture, allowlist, and self-exit tests a controlled third-party window without using real games or user applications. The later Windows integration suite should consume this fixture through harness launch/control helpers rather than defining a second fixture application.
 
 Alternative considered: automate Notepad. Notepad is convenient but OS-version differences and localized titles make it less deterministic.
 

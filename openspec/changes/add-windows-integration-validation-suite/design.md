@@ -2,7 +2,7 @@
 
 The application safety guardrails have a manual Windows checklist because foreground focus, global hotkeys, tray dialogs, localhost REST timing, and process-exit behavior need a real Windows user session. Unit tests cover policy and command seams, but they cannot prove the published tray app behaves correctly when launched as a real process with visible windows.
 
-This change adds a Windows integration suite after `add-integration-testability-seams` is implemented. The suite should run against the published tray app with isolated config and a stable fixture window, and it should clearly separate tests that can run in any Windows process from tests that require an interactive desktop session.
+This change adds a Windows integration suite after `add-integration-testability-seams` is implemented. The suite should run against the published tray app with isolated config and the stable fixture window provided by that seams change, and it should clearly separate tests that can run in any Windows process from tests that require an interactive desktop session.
 
 ## Goals / Non-Goals
 
@@ -43,7 +43,7 @@ Alternative considered: in-process integration tests. Those are easier but dupli
 
 ### Use a controlled fixture window and desktop automation
 
-Use the test-window fixture for focus and process identity. Use Win32 focus/hotkey helpers and a UI Automation approach, such as a test-only UIA library, to accept or cancel the confirmation prompt. Keep those dependencies in the test project only.
+Use the test-window fixture owned by `add-integration-testability-seams` for focus and process identity. This suite owns only the harness helpers that launch, focus, observe, and clean up that fixture during tests. Use Win32 focus/hotkey helpers and a UI Automation approach, such as a test-only UIA library, to accept or cancel the confirmation prompt. Keep those dependencies in the test project only.
 
 Alternative considered: hand-written polling against arbitrary window titles. That is more brittle and gives worse failure diagnostics.
 

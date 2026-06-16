@@ -1,3 +1,5 @@
+using MouseShenanigans.Windows;
+
 namespace MouseShenanigans.Tray;
 
 public sealed class LocalControlHost : IDisposable
@@ -5,17 +7,29 @@ public sealed class LocalControlHost : IDisposable
     private readonly LocalControlOptions options;
     private readonly LocalControlEndpointHandler handler;
     private readonly ILocalControlWebApplicationFactory factory;
+    private readonly IDiagnosticRecorder diagnosticRecorder;
     private ILocalControlWebApplication? application;
     private bool disposed;
 
     public LocalControlHost(
         LocalControlOptions options,
         LocalControlEndpointHandler handler,
-        ILocalControlWebApplicationFactory factory)
+        ILocalControlWebApplicationFactory factory,
+        IDiagnosticRecorder? diagnosticRecorder = null,
+        string? startupValidationFailureMessage = null)
     {
         this.options = options ?? throw new ArgumentNullException(nameof(options));
         this.handler = handler ?? throw new ArgumentNullException(nameof(handler));
         this.factory = factory ?? throw new ArgumentNullException(nameof(factory));
+        this.diagnosticRecorder = diagnosticRecorder ?? NullDiagnosticRecorder.Instance;
+
+        if (!string.IsNullOrWhiteSpace(startupValidationFailureMessage))
+        {
+            Status = LocalControlHostStatus.Failed(startupValidationFailureMessage);
+            this.diagnosticRecorder.Record(
+                DiagnosticEventTypes.LocalControlStartupFailed,
+                Status.Message ?? startupValidationFailureMessage);
+        }
     }
 
     public LocalControlHostStatus Status { get; private set; } = LocalControlHostStatus.Stopped;
@@ -34,12 +48,18 @@ public sealed class LocalControlHost : IDisposable
             application = factory.Create(options, handler);
             application.Start();
             Status = LocalControlHostStatus.Available(options.UrlText);
+            diagnosticRecorder.Record(
+                DiagnosticEventTypes.LocalControlStarted,
+                $"Local control started at {options.UrlText}.");
         }
         catch (Exception ex)
         {
             application?.Dispose();
             application = null;
             Status = LocalControlHostStatus.Failed(ex.Message);
+            diagnosticRecorder.Record(
+                DiagnosticEventTypes.LocalControlStartupFailed,
+                Status.Message ?? ex.Message);
         }
     }
 

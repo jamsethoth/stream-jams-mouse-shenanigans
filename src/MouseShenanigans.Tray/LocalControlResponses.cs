@@ -1,3 +1,5 @@
+using MouseShenanigans.Windows;
+
 namespace MouseShenanigans.Tray;
 
 public sealed record LocalControlRuntimeSnapshotResponse(
@@ -19,5 +21,9 @@ public sealed record LocalControlErrorResponse(
     bool Ok,
     string Error,
     string Message);
+
+public sealed record LocalControlDiagnosticsResponse(
+    bool Ok,
+    IReadOnlyList<DiagnosticEvent> Events);
 
 public sealed record LocalControlSelectProfileRequest(string? Name);

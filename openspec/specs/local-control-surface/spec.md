@@ -3,9 +3,7 @@
 ## Purpose
 
 Define the localhost-only HTTP JSON control surface hosted by the tray process for local streaming automation tools.
-
 ## Requirements
-
 ### Requirement: Local HTTP listener lifecycle
 The system SHALL host a localhost-only HTTP JSON control surface for the lifetime of the tray process when listener startup succeeds.
 
@@ -118,3 +116,33 @@ The system SHALL cover local control routing and command dispatch with automated
 - **GIVEN** the change is implemented
 - **WHEN** manual Windows verification is performed
 - **THEN** verification covers calling enable, disable, toggle, emergency disable, capture foreground target, select profile, reload configuration, and status endpoints from Streamer.bot or equivalent local HTTP tooling
+
+### Requirement: Local diagnostics endpoint
+The system SHALL expose recent diagnostic events through the localhost-only local control surface for validation and troubleshooting.
+
+#### Scenario: Diagnostics endpoint returns event history
+- **GIVEN** the local control listener is running
+- **WHEN** a client requests the diagnostics endpoint
+- **THEN** the response is JSON
+- **AND** it includes recent diagnostic events in chronological or reverse-chronological order
+- **AND** it remains restricted to loopback local control
+
+#### Scenario: Diagnostics endpoint is stable for automation
+- **GIVEN** a validation-relevant event occurred
+- **WHEN** an integration test queries diagnostics
+- **THEN** the response contains stable fields for event type, timestamp, message, and captured identity when available
+
+### Requirement: Local control URL override remains loopback-only
+The system SHALL allow a startup override for the local-control bind URL while preserving the loopback-only security boundary.
+
+#### Scenario: Test run overrides local-control URL
+- **GIVEN** the tray app is launched with a local-control URL override using an HTTP loopback address
+- **WHEN** the local control listener starts
+- **THEN** it binds to the overridden URL
+- **AND** tray-visible status and diagnostics identify the active URL
+
+#### Scenario: Non-loopback override is rejected
+- **GIVEN** the tray app is launched with a non-loopback local-control URL override
+- **WHEN** local control options are validated
+- **THEN** validation fails
+- **AND** the listener does not bind to the non-loopback address

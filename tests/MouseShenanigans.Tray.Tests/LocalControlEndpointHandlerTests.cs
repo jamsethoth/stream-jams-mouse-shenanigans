@@ -59,6 +59,32 @@ public sealed class LocalControlEndpointHandlerTests
     }
 
     [Fact]
+    public void DiagnosticsEndpointReturnsStableEventShape()
+    {
+        var recorder = new BoundedDiagnosticRecorder(
+            clock: () => new DateTimeOffset(2026, 6, 15, 12, 0, 0, TimeSpan.Zero));
+        recorder.Record(
+            DiagnosticEventTypes.SafetyBlockedEnable,
+            "Enable blocked.",
+            new DiagnosticCapturedIdentity(ProcessName: "TargetApp", WindowTitle: "Target App", RuleName: "deny"));
+        var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Disabled);
+        var handler = new LocalControlEndpointHandler(new RuntimeCommandController(runtime), recorder);
+
+        LocalControlEndpointResult result = handler.GetDiagnostics();
+
+        Assert.Equal(200, result.StatusCode);
+        var response = Assert.IsType<LocalControlDiagnosticsResponse>(result.Body);
+        DiagnosticEvent diagnosticEvent = Assert.Single(response.Events);
+        Assert.True(response.Ok);
+        Assert.Equal(DiagnosticEventTypes.SafetyBlockedEnable, diagnosticEvent.Type);
+        Assert.Equal("TargetApp", diagnosticEvent.CapturedIdentity?.ProcessName);
+
+        string json = JsonSerializer.Serialize(response, JsonOptions);
+        Assert.Contains("\"events\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"capturedIdentity\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void UnknownProfileReturnsProfileNotFoundWithoutChangingActiveProfile()
     {
         RuntimeConfiguration configuration = CreateConfiguration();
@@ -151,6 +177,8 @@ public sealed class LocalControlEndpointHandlerTests
             RuntimeProofOfConceptDefaults.CreateConfiguration());
         var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Disabled);
         var refreshRequests = 0;
+        var recorder = new BoundedDiagnosticRecorder(
+            clock: () => new DateTimeOffset(2026, 6, 15, 12, 0, 0, TimeSpan.Zero));
         var handler = new LocalControlEndpointHandler(
             new RuntimeCommandController(
                 runtime,
@@ -158,6 +186,7 @@ public sealed class LocalControlEndpointHandlerTests
                 new StubTargetWindowReader(new TargetWindowSnapshot(
                     foregroundWindow: new TargetWindowInfo("notepad", "Untitled - Notepad"),
                     windowUnderCursor: null))),
+            recorder,
             requestStatusRefresh: () => refreshRequests++);
 
         LocalControlEndpointResult result = handler.CaptureForegroundTarget();
@@ -170,6 +199,9 @@ public sealed class LocalControlEndpointHandlerTests
         Assert.Equal("notepad", store.SavedConfigurations.Single().TargetSelector.ProcessName);
         Assert.Equal("notepad", runtime.AppliedOptions.Single().TargetSelector.ProcessName);
         Assert.Equal(1, refreshRequests);
+        Assert.Equal(
+            [DiagnosticEventTypes.ForegroundCaptureRequested, DiagnosticEventTypes.ForegroundCaptureAccepted],
+            recorder.Snapshot().Select(diagnosticEvent => diagnosticEvent.Type));
     }
 
     [Fact]
@@ -182,11 +214,13 @@ public sealed class LocalControlEndpointHandlerTests
             RuntimeProofOfConceptDefaults.CreateConfiguration());
         var runtime = new RecordingRuntimeController(RuntimeRemappingStatus.Disabled);
         var refreshRequests = 0;
+        var recorder = new BoundedDiagnosticRecorder();
         var handler = new LocalControlEndpointHandler(
             new RuntimeCommandController(
                 runtime,
                 configurationController,
                 new StubTargetWindowReader(TargetWindowSnapshot.Empty)),
+            recorder,
             requestStatusRefresh: () => refreshRequests++);
 
         LocalControlEndpointResult result = handler.CaptureForegroundTarget();
@@ -200,6 +234,9 @@ public sealed class LocalControlEndpointHandlerTests
         Assert.Empty(store.SavedConfigurations);
         Assert.Empty(runtime.AppliedOptions);
         Assert.Equal(1, refreshRequests);
+        Assert.Equal(
+            [DiagnosticEventTypes.ForegroundCaptureRequested, DiagnosticEventTypes.ForegroundCaptureFailed],
+            recorder.Snapshot().Select(diagnosticEvent => diagnosticEvent.Type));
     }
 
     [Fact]

@@ -5,17 +5,20 @@ namespace MouseShenanigans.Tray;
 public sealed class LocalControlEndpointHandler
 {
     private readonly RuntimeCommandController commandController;
+    private readonly IDiagnosticRecorder diagnosticRecorder;
     private readonly Func<string?> getDegradedStatusMessage;
     private readonly Action requestStatusRefresh;
     private readonly Func<Func<LocalControlEndpointResult>, LocalControlEndpointResult> runRequestOnControlThread;
 
     public LocalControlEndpointHandler(
         RuntimeCommandController commandController,
+        IDiagnosticRecorder? diagnosticRecorder = null,
         Func<string?>? getDegradedStatusMessage = null,
         Action? requestStatusRefresh = null,
         Func<Func<LocalControlEndpointResult>, LocalControlEndpointResult>? runRequestOnControlThread = null)
     {
         this.commandController = commandController ?? throw new ArgumentNullException(nameof(commandController));
+        this.diagnosticRecorder = diagnosticRecorder ?? NullDiagnosticRecorder.Instance;
         this.getDegradedStatusMessage = getDegradedStatusMessage ?? (() => null);
         this.requestStatusRefresh = requestStatusRefresh ?? (() => { });
         this.runRequestOnControlThread = runRequestOnControlThread ?? (operation => operation());
@@ -24,6 +27,13 @@ public sealed class LocalControlEndpointHandler
     public LocalControlEndpointResult GetStatus()
     {
         return runRequestOnControlThread(() => LocalControlEndpointResult.Ok(CreateSnapshot()));
+    }
+
+    public LocalControlEndpointResult GetDiagnostics()
+    {
+        return LocalControlEndpointResult.Ok(new LocalControlDiagnosticsResponse(
+            Ok: true,
+            Events: diagnosticRecorder.Snapshot()));
     }
 
     public LocalControlEndpointResult GetProfiles()
@@ -81,6 +91,10 @@ public sealed class LocalControlEndpointHandler
 
     private LocalControlEndpointResult CaptureForegroundTargetCore()
     {
+        diagnosticRecorder.Record(
+            DiagnosticEventTypes.ForegroundCaptureRequested,
+            "Foreground target capture requested.");
+
         try
         {
             RuntimeConfigurationOperationResult result = commandController.CaptureForegroundTarget();
@@ -88,6 +102,9 @@ public sealed class LocalControlEndpointHandler
 
             if (!result.Succeeded)
             {
+                diagnosticRecorder.Record(
+                    DiagnosticEventTypes.ForegroundCaptureFailed,
+                    result.Message ?? "Target capture failed.");
                 string errorCode = IsTargetCaptureFailure(result.Message)
                     ? LocalControlErrorCodes.TargetCaptureFailed
                     : LocalControlErrorCodes.ConfigurationSaveFailed;
@@ -97,10 +114,18 @@ public sealed class LocalControlEndpointHandler
                     Message: result.Message ?? "Target capture failed."));
             }
 
+            RuntimeTargetSelector selector = result.Configuration.TargetSelector;
+            diagnosticRecorder.Record(
+                DiagnosticEventTypes.ForegroundCaptureAccepted,
+                "Foreground target capture completed.",
+                new DiagnosticCapturedIdentity(
+                    ProcessName: selector.ProcessName,
+                    WindowTitle: selector.WindowTitleContains));
             return LocalControlEndpointResult.Ok(CreateSnapshot());
         }
         catch (InvalidOperationException ex)
         {
+            diagnosticRecorder.Record(DiagnosticEventTypes.ForegroundCaptureFailed, ex.Message);
             return LocalControlEndpointResult.BadRequest(new LocalControlErrorResponse(
                 Ok: false,
                 Error: LocalControlErrorCodes.ConfigurationUnavailable,
