@@ -6,6 +6,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MouseShenanigans.Core.Tests/MouseShenanigans.Core.Tests.csproj" />
+    <Project Path="tests/MouseShenanigans.TestWindowFixture/MouseShenanigans.TestWindowFixture.csproj" />
     <Project Path="tests/MouseShenanigans.Tray.Tests/MouseShenanigans.Tray.Tests.csproj" />
     <Project Path="tests/MouseShenanigans.Windows.Tests/MouseShenanigans.Windows.Tests.csproj" />
   </Folder>

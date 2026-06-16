@@ -5,6 +5,8 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
+        TrayStartupOptions startupOptions = TrayStartupOptions.FromEnvironment();
+
         if (!TraySingleInstanceGuard.TryAcquire(out TraySingleInstanceGuard? singleInstanceGuard))
         {
             return;
@@ -13,7 +15,7 @@ internal static class Program
         using (singleInstanceGuard)
         {
             ApplicationConfiguration.Initialize();
-            Application.Run(new TrayApplicationContext());
+            Application.Run(new TrayApplicationContext(startupOptions));
         }
 
         Environment.Exit(0);

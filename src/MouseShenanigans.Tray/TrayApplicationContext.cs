@@ -4,6 +4,8 @@ namespace MouseShenanigans.Tray;
 
 internal sealed class TrayApplicationContext : ApplicationContext
 {
+    private readonly TrayStartupOptions startupOptions;
+    private readonly IDiagnosticRecorder diagnosticRecorder;
     private readonly AbsoluteCursorRemappingCoordinator runtime;
     private readonly RuntimeCommandController runtimeCommandController;
     private readonly ToolStripMenuItem statusItem;
@@ -26,8 +28,16 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private bool disposed;
 
     public TrayApplicationContext()
+        : this(TrayStartupOptions.FromEnvironment())
     {
-        runtimeConfigurationController = CreateRuntimeConfigurationController();
+    }
+
+    public TrayApplicationContext(TrayStartupOptions startupOptions)
+    {
+        this.startupOptions = startupOptions ?? throw new ArgumentNullException(nameof(startupOptions));
+        diagnosticRecorder = CreateDiagnosticRecorder(this.startupOptions);
+        RecordStartupValidationMessages(this.startupOptions, diagnosticRecorder);
+        runtimeConfigurationController = CreateRuntimeConfigurationController(this.startupOptions, diagnosticRecorder);
         runtime = CreateRuntime(runtimeConfigurationController.Current.CreateRuntimeOptions());
         runtimeCommandController = new RuntimeCommandController(
             runtime,
@@ -72,7 +82,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
             runtimeCommandController,
             UpdateRuntimeStatus);
         hotkeyReceiver = new TrayHotkeyReceiver(hotkeyController.DispatchHotkey);
-        localControlHost = CreateLocalControlHost(runtimeCommandController, UpdateRuntimeStatus);
+        localControlHost = CreateLocalControlHost(
+            runtimeCommandController,
+            UpdateRuntimeStatus,
+            this.startupOptions,
+            diagnosticRecorder);
         shutdownController = new TrayShutdownController(
             runtime,
             HideNotifyIcon,
@@ -149,7 +163,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
             status,
             runtimeConfigurationController.Current,
             runtimeConfigurationController.StatusMessage,
-            localControlHost.Status.Message);
+            localControlHost.Status.Message,
+            startupOptions.ValidationMessage);
         hotkeyStatusItem.Text = TrayStatusFormatter.CreateHotkeyStatusText(
             hotkeyController.RegistrationResult,
             hotkeyController.LastDispatchedCommand,
@@ -185,28 +200,57 @@ internal sealed class TrayApplicationContext : ApplicationContext
             WindowsRuntime.IsDesktopInputAvailable);
     }
 
-    private static RuntimeConfigurationController CreateRuntimeConfigurationController()
+    private static RuntimeConfigurationController CreateRuntimeConfigurationController(
+        TrayStartupOptions startupOptions,
+        IDiagnosticRecorder diagnosticRecorder)
     {
+        IRuntimeConfigurationStore store = startupOptions.HasInvalidRuntimeConfigurationPathOverride
+            ? new InvalidRuntimeConfigurationStore(
+                startupOptions.RuntimeConfigurationPath ?? "<invalid override>",
+                startupOptions.RuntimeConfigurationPathError!)
+            : new RuntimeConfigurationFileStore(new RuntimeConfigurationPathProvider(startupOptions.RuntimeConfigurationPath));
+
         return new RuntimeConfigurationController(
-            new RuntimeConfigurationFileStore(new RuntimeConfigurationPathProvider()),
-            RuntimeProofOfConceptDefaults.CreateConfiguration());
+            store,
+            RuntimeProofOfConceptDefaults.CreateConfiguration(),
+            diagnosticRecorder);
     }
 
     private static LocalControlHost CreateLocalControlHost(
         RuntimeCommandController commandController,
-        Action refreshStatus)
+        Action refreshStatus,
+        TrayStartupOptions startupOptions,
+        IDiagnosticRecorder diagnosticRecorder)
     {
         SynchronizationContext? synchronizationContext = SynchronizationContext.Current;
         var handler = new LocalControlEndpointHandler(
             commandController,
-            getDegradedStatusMessage: () => null,
+            diagnosticRecorder,
+            getDegradedStatusMessage: () => startupOptions.ValidationMessage,
             requestStatusRefresh: () => RunOnSynchronizationContext(synchronizationContext, refreshStatus),
             runRequestOnControlThread: operation => RunOnSynchronizationContext(synchronizationContext, operation));
 
         return new LocalControlHost(
-            LocalControlOptions.Default,
+            startupOptions.LocalControlOptions ?? LocalControlOptions.Default,
             handler,
-            new KestrelLocalControlWebApplicationFactory());
+            new KestrelLocalControlWebApplicationFactory(),
+            diagnosticRecorder,
+            startupOptions.LocalControlUrlError);
+    }
+
+    private static BoundedDiagnosticRecorder CreateDiagnosticRecorder(TrayStartupOptions startupOptions)
+    {
+        return new BoundedDiagnosticRecorder(jsonLinesPath: startupOptions.DiagnosticsPath);
+    }
+
+    private static void RecordStartupValidationMessages(
+        TrayStartupOptions startupOptions,
+        IDiagnosticRecorder diagnosticRecorder)
+    {
+        foreach (string message in startupOptions.ValidationMessages)
+        {
+            diagnosticRecorder.Record(DiagnosticEventTypes.StartupOverrideInvalid, message);
+        }
     }
 
     private static void RunOnSynchronizationContext(SynchronizationContext? synchronizationContext, Action action)

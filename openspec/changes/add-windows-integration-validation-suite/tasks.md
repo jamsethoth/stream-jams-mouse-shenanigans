@@ -11,7 +11,7 @@
 - [ ] 2.2 Add helpers to publish or locate the tray app artifact under test.
 - [ ] 2.3 Add process launch helpers that set temp config path, test local-control URL, diagnostics settings, and sentinel interval overrides.
 - [ ] 2.4 Add readiness polling for local-control status and diagnostics.
-- [ ] 2.5 Add cleanup that stops only tray and fixture processes launched by the harness.
+- [ ] 2.5 Add cleanup that stops only tray and seam-provided fixture processes launched by the harness.
 - [ ] 2.6 Add tests proving harness isolation does not read or write the user's production configuration path.
 
 ## 3. Noninteractive Local-Control Validation
@@ -25,7 +25,7 @@
 ## 4. Interactive Desktop Validation
 
 - [ ] 4.1 Add prerequisite detection for real Windows desktop, foreground-window control, global hotkey delivery, and UI Automation support.
-- [ ] 4.2 Add helpers to start the fixture window and make it the foreground window.
+- [ ] 4.2 Add helpers to start the seam-provided fixture window and make it the foreground window.
 - [ ] 4.3 Add helpers to send `Ctrl+Alt+Shift+F9` using a real keyboard input path.
 - [ ] 4.4 Add UI Automation helpers to locate the confirmation prompt, assert captured identity text, and accept or cancel it.
 - [ ] 4.5 Automate hotkey capture confirmation accept and verify `allowedApplications` persistence without enabling remapping.

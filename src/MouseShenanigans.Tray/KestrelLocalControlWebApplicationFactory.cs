@@ -30,6 +30,7 @@ public sealed class KestrelLocalControlWebApplicationFactory : ILocalControlWebA
     private static void MapRoutes(IEndpointRouteBuilder app, LocalControlEndpointHandler handler)
     {
         app.MapGet("/api/v1/status", () => ToHttpResult(handler.GetStatus()));
+        app.MapGet("/api/v1/diagnostics", () => ToHttpResult(handler.GetDiagnostics()));
         app.MapPost("/api/v1/runtime/enable", () => ToHttpResult(handler.Execute(RuntimeCommand.EnableRuntime)));
         app.MapPost("/api/v1/runtime/disable", () => ToHttpResult(handler.Execute(RuntimeCommand.DisableRuntime)));
         app.MapPost("/api/v1/runtime/toggle", () => ToHttpResult(handler.Execute(RuntimeCommand.ToggleRuntime)));

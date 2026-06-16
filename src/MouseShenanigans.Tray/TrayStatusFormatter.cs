@@ -19,7 +19,8 @@ public static class TrayStatusFormatter
         RuntimeRemappingStatus status,
         RuntimeConfiguration? configuration = null,
         string? configurationStatus = null,
-        string? localControlStatus = null)
+        string? localControlStatus = null,
+        string? startupValidationStatus = null)
     {
         string target = configuration?.TargetDisplayName ?? RuntimeProofOfConceptDefaults.TargetProcessName;
         string profile = configuration?.ActiveProfileName ?? RuntimeProofOfConceptDefaults.ActiveProfileName;
@@ -31,7 +32,7 @@ public static class TrayStatusFormatter
             _ => $"Disabled for {target} using {profile}",
         };
 
-        string[] messages = new[] { status.Message, configurationStatus, localControlStatus }
+        string[] messages = new[] { status.Message, configurationStatus, localControlStatus, startupValidationStatus }
             .Where(message => !string.IsNullOrWhiteSpace(message))
             .Select(message => message!)
             .ToArray();

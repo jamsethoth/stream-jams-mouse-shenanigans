@@ -21,10 +21,12 @@ public sealed class LocalControlHostTests
     public void StartReportsAvailableWhenApplicationStarts()
     {
         var factory = new RecordingApplicationFactory();
+        var recorder = new BoundedDiagnosticRecorder();
         using var host = new LocalControlHost(
             LocalControlOptions.Default,
             CreateHandler(),
-            factory);
+            factory,
+            recorder);
 
         host.Start();
 
@@ -32,6 +34,9 @@ public sealed class LocalControlHostTests
         Assert.Equal(LocalControlOptions.Default.UrlText, host.Status.Url);
         Assert.Single(factory.Applications);
         Assert.Equal(["start"], factory.Applications[0].Operations);
+        DiagnosticEvent diagnosticEvent = Assert.Single(recorder.Snapshot());
+        Assert.Equal(DiagnosticEventTypes.LocalControlStarted, diagnosticEvent.Type);
+        Assert.Contains(LocalControlOptions.Default.UrlText, diagnosticEvent.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -41,15 +46,40 @@ public sealed class LocalControlHostTests
         {
             CreateException = new InvalidOperationException("port already in use"),
         };
+        var recorder = new BoundedDiagnosticRecorder();
         using var host = new LocalControlHost(
             LocalControlOptions.Default,
             CreateHandler(),
-            factory);
+            factory,
+            recorder);
 
         host.Start();
 
         Assert.Equal(LocalControlHostState.Failed, host.Status.State);
         Assert.Contains("port already in use", host.Status.Message, StringComparison.Ordinal);
+        DiagnosticEvent diagnosticEvent = Assert.Single(recorder.Snapshot());
+        Assert.Equal(DiagnosticEventTypes.LocalControlStartupFailed, diagnosticEvent.Type);
+        Assert.Contains("port already in use", diagnosticEvent.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StartupValidationFailureDoesNotBindLocalControl()
+    {
+        var factory = new RecordingApplicationFactory();
+        var recorder = new BoundedDiagnosticRecorder();
+        using var host = new LocalControlHost(
+            LocalControlOptions.Default,
+            CreateHandler(),
+            factory,
+            recorder,
+            startupValidationFailureMessage: "Local control URL must be loopback.");
+
+        host.Start();
+
+        Assert.Equal(LocalControlHostState.Failed, host.Status.State);
+        Assert.Empty(factory.Applications);
+        DiagnosticEvent diagnosticEvent = Assert.Single(recorder.Snapshot());
+        Assert.Equal(DiagnosticEventTypes.LocalControlStartupFailed, diagnosticEvent.Type);
     }
 
     [Fact]

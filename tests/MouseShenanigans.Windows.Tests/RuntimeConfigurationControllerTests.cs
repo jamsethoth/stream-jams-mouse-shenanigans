@@ -31,13 +31,20 @@ public sealed class RuntimeConfigurationControllerTests
         {
             SaveException = new UnauthorizedAccessException("denied"),
         };
-        var controller = new RuntimeConfigurationController(store, RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var recorder = new BoundedDiagnosticRecorder(clock: FixedClock);
+        var controller = new RuntimeConfigurationController(
+            store,
+            RuntimeProofOfConceptDefaults.CreateConfiguration(),
+            recorder);
 
         RuntimeConfigurationOperationResult result = controller.SelectProfile("double-right");
 
         Assert.False(result.Succeeded);
         Assert.Equal("double-right", controller.Current.ActiveProfileName);
         Assert.Contains("save failed", controller.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        DiagnosticEvent diagnosticEvent = Assert.Single(recorder.Snapshot());
+        Assert.Equal(DiagnosticEventTypes.ConfigurationSaveFailed, diagnosticEvent.Type);
+        Assert.Contains("denied", diagnosticEvent.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -98,13 +105,42 @@ public sealed class RuntimeConfigurationControllerTests
         {
             ReloadException = new InvalidDataException("invalid"),
         };
-        var controller = new RuntimeConfigurationController(store, RuntimeProofOfConceptDefaults.CreateConfiguration());
+        var recorder = new BoundedDiagnosticRecorder(clock: FixedClock);
+        var controller = new RuntimeConfigurationController(
+            store,
+            RuntimeProofOfConceptDefaults.CreateConfiguration(),
+            recorder);
 
         RuntimeConfigurationOperationResult result = controller.Reload();
 
         Assert.False(result.Succeeded);
         Assert.Same(initial, controller.Current);
         Assert.Contains("reload failed", controller.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        DiagnosticEvent diagnosticEvent = Assert.Single(recorder.Snapshot());
+        Assert.Equal(DiagnosticEventTypes.ConfigurationReloadFailed, diagnosticEvent.Type);
+        Assert.Contains("invalid", diagnosticEvent.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InvalidRuntimeConfigurationStoreReportsFallbackWithoutUsingProductionPath()
+    {
+        RuntimeConfiguration fallback = RuntimeProofOfConceptDefaults.CreateConfiguration();
+        var store = new InvalidRuntimeConfigurationStore("<invalid override>", "override path is invalid");
+        var recorder = new BoundedDiagnosticRecorder(clock: FixedClock);
+        var controller = new RuntimeConfigurationController(store, fallback, recorder);
+
+        Assert.Same(fallback, controller.Current);
+        Assert.Equal("<invalid override>", controller.ConfigurationPath);
+        Assert.Contains("override path is invalid", controller.StatusMessage, StringComparison.Ordinal);
+
+        DiagnosticEvent diagnosticEvent = Assert.Single(recorder.Snapshot());
+        Assert.Equal(DiagnosticEventTypes.ConfigurationLoadFallback, diagnosticEvent.Type);
+        Assert.Contains("override path is invalid", diagnosticEvent.Message, StringComparison.Ordinal);
+    }
+
+    private static DateTimeOffset FixedClock()
+    {
+        return new DateTimeOffset(2026, 6, 15, 12, 0, 0, TimeSpan.Zero);
     }
 
     public static RuntimeConfiguration CreateConfiguration()
