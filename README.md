@@ -69,6 +69,8 @@ The app should be able to switch profiles immediately while running. That matter
 
 The project exposes a small loopback-only HTTP JSON control surface that Streamer.bot can invoke as actions. It supports runtime enable, disable, toggle, emergency disable, status, diagnostics, foreground target capture, foreground safety allowlist capture, profile listing, active profile selection, and configuration reload.
 
+Importable Streamer.bot actions for this control surface belong in the separate `stream-jams-streamerbot-modules` project; this repository owns the app and local API contract that those actions call.
+
 The app does not expose a public remote API. WebSockets, named pipes, remote access, and profile editing endpoints are outside the current scope unless a later streaming workflow needs them.
 
 ## MVP Scope
@@ -200,7 +202,7 @@ Invoke-RestMethod "$base/api/v1/profiles/select" -Method Post -ContentType 'appl
 Invoke-RestMethod "$base/api/v1/config/reload" -Method Post
 ```
 
-Foreground capture endpoints require a real interactive desktop session with a usable foreground window. The local control surface is only for loopback automation such as Streamer.bot actions; it is not a public remote API.
+Foreground capture endpoints require a real interactive desktop session with a usable foreground window. The local control surface is only for loopback automation such as Streamer.bot actions; it is not a public remote API. For Streamer.bot import/setup, use the MouseShenanigans module from the separate `stream-jams-streamerbot-modules` project.
 
 The solution also includes `MouseShenanigans.TestWindowFixture`, a Windows-only fixture utility under `tests/`. It opens a normal visible window with a stable process name and default title, and it can write a readiness file when started with `--ready-file <path>`. It is a validation fixture only and is not included when publishing `src\MouseShenanigans.Tray\MouseShenanigans.Tray.csproj`.
 
