@@ -48,22 +48,35 @@
 - [ ] 6.4 Keep diagnostics transparent and avoid any stealth, obfuscation, or anti-cheat evasion behavior.
 - [ ] 6.5 Add tests for status formatting and diagnostic message generation.
 
-## 7. Automated Validation
+## 7. Windows Integration Suite Coverage
 
-- [ ] 7.1 Run `dotnet restore MouseShenanigans.slnx`.
-- [ ] 7.2 Run `dotnet format MouseShenanigans.slnx --verify-no-changes --no-restore`.
-- [ ] 7.3 Run `dotnet build MouseShenanigans.slnx --configuration Release --no-restore`.
-- [ ] 7.4 Run `dotnet test MouseShenanigans.slnx --configuration Release --no-build`.
-- [ ] 7.5 Run `dotnet publish src\MouseShenanigans.Tray\MouseShenanigans.Tray.csproj --configuration Release --no-restore`.
-- [ ] 7.6 Run `openspec.cmd validate add-game-safety-guardrails --strict`.
-- [ ] 7.7 Run `openspec.cmd validate --specs --strict`.
+- [ ] 7.1 Add Windows integration tests using the validation suite for empty game allowlist enable denial through local control.
+- [ ] 7.2 Add Windows integration tests using the validation suite for allowlisted fixture game target enable success.
+- [ ] 7.3 Add Windows integration tests using the validation suite for protected deny precedence over an allowlisted fixture target.
+- [ ] 7.4 Add Windows integration tests using the validation suite for self-exit while runtime is enabled and while runtime is disabled.
+- [ ] 7.5 Assert the matched fixture process remains running after MouseShenanigans exits itself.
+- [ ] 7.6 Assert diagnostics identify blocked enable attempts, matched deny rules, matched self-exit entries, and shutdown reasons.
+- [ ] 7.7 Extend the non-evasive scan with guardrail-specific checks for no game memory reads, anti-cheat tampering, process injection, overlays, concealment, or stealth behavior.
+- [ ] 7.8 Ensure unsupported desktop prerequisites report skipped or inconclusive results distinctly from passing tests.
 
-## 8. Manual Windows Validation
+## 8. Automated Validation
 
-- [ ] 8.1 Start with no game allowlist entries and verify a game target enable attempt is blocked before mouse observation starts.
-- [ ] 8.2 Add a test game process to the local allowlist and verify enabling succeeds only for the matching process identity.
-- [ ] 8.3 Launch a non-allowlisted game candidate while runtime is enabled and verify MouseShenanigans disables, releases cursor lock, unregisters mouse observation, logs the reason, and exits itself.
-- [ ] 8.4 Launch a protected-game denylisted process while runtime is disabled and verify MouseShenanigans exits itself without touching the game process.
-- [ ] 8.5 Verify tray and hotkey enable paths both fail closed when safety denies enablement.
-- [ ] 8.6 Verify emergency disable still works while safety is denying enablement.
-- [ ] 8.7 Inspect the implementation and release artifact to confirm no drivers, services, elevated input layers, game-process injection, overlays, game memory reads, anti-cheat tampering, concealment obfuscation, or stealth behavior were added.
+- [ ] 8.1 Run `dotnet restore MouseShenanigans.slnx`.
+- [ ] 8.2 Run `dotnet format MouseShenanigans.slnx --verify-no-changes --no-restore`.
+- [ ] 8.3 Run `dotnet build MouseShenanigans.slnx --configuration Release --no-restore`.
+- [ ] 8.4 Run `dotnet test MouseShenanigans.slnx --configuration Release --no-build`.
+- [ ] 8.5 Run `dotnet publish src\MouseShenanigans.Tray\MouseShenanigans.Tray.csproj --configuration Release --no-restore`.
+- [ ] 8.6 Run the non-desktop Windows integration guardrail suite, or record the explicit skip/inconclusive reason if the validation suite is unavailable.
+- [ ] 8.7 Run the desktop Windows integration guardrail suite when a real Windows desktop session is available, or record the explicit skip/inconclusive reason.
+- [ ] 8.8 Run `openspec.cmd validate add-game-safety-guardrails --strict`.
+- [ ] 8.9 Run `openspec.cmd validate --specs --strict`.
+
+## 9. Manual Windows Validation
+
+- [ ] 9.1 Start with no game allowlist entries and verify a game target enable attempt is blocked before mouse observation starts.
+- [ ] 9.2 Add a test game process to the local allowlist and verify enabling succeeds only for the matching process identity.
+- [ ] 9.3 Launch a non-allowlisted game candidate while runtime is enabled and verify MouseShenanigans disables, releases cursor lock, unregisters mouse observation, logs the reason, and exits itself.
+- [ ] 9.4 Launch a protected-game denylisted process while runtime is disabled and verify MouseShenanigans exits itself without touching the game process.
+- [ ] 9.5 Verify tray and hotkey enable paths both fail closed when safety denies enablement.
+- [ ] 9.6 Verify emergency disable still works while safety is denying enablement.
+- [ ] 9.7 Inspect the implementation and release artifact to confirm no drivers, services, elevated input layers, game-process injection, overlays, game memory reads, anti-cheat tampering, concealment obfuscation, or stealth behavior were added.
