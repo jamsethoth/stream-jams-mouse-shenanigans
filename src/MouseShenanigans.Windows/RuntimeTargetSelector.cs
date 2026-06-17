@@ -2,25 +2,18 @@ namespace MouseShenanigans.Windows;
 
 public sealed class RuntimeTargetSelector
 {
+    private readonly ApplicationIdentity identity;
+
     private RuntimeTargetSelector(string? processName, string? executablePath, string? windowTitleContains)
     {
-        ProcessName = NormalizeProcessName(processName);
-        ExecutablePath = NormalizeExecutablePath(executablePath);
-        WindowTitleContains = string.IsNullOrWhiteSpace(windowTitleContains)
-            ? null
-            : windowTitleContains.Trim();
-
-        if (ProcessName is null && ExecutablePath is null && WindowTitleContains is null)
-        {
-            throw new ArgumentException("A runtime target must include a process name, executable path, or window title match.");
-        }
+        identity = new ApplicationIdentity(processName, executablePath, windowTitleContains);
     }
 
-    public string? ProcessName { get; }
+    public string? ProcessName => identity.ProcessName;
 
-    public string? ExecutablePath { get; }
+    public string? ExecutablePath => identity.ExecutablePath;
 
-    public string? WindowTitleContains { get; }
+    public string? WindowTitleContains => identity.WindowTitleContains;
 
     public static RuntimeTargetSelector ForProcessName(string processName)
     {
@@ -124,7 +117,10 @@ public sealed class RuntimeTargetSelector
         }
 
         if (ProcessName is not null
-            && string.Equals(NormalizeProcessName(window.ProcessName), ProcessName, StringComparison.OrdinalIgnoreCase))
+            && string.Equals(
+                ApplicationIdentity.NormalizeProcessName(window.ProcessName),
+                ProcessName,
+                StringComparison.OrdinalIgnoreCase))
         {
             if (ExecutablePath is null || string.Equals(window.ExecutablePath, ExecutablePath, StringComparison.OrdinalIgnoreCase))
             {
@@ -144,21 +140,4 @@ public sealed class RuntimeTargetSelector
             && window.Title.Contains(WindowTitleContains, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string? NormalizeProcessName(string? processName)
-    {
-        if (string.IsNullOrWhiteSpace(processName))
-        {
-            return null;
-        }
-
-        string trimmed = processName.Trim();
-        return trimmed.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-            ? trimmed[..^4]
-            : trimmed;
-    }
-
-    private static string? NormalizeExecutablePath(string? executablePath)
-    {
-        return ApplicationIdentity.NormalizeExecutablePath(executablePath);
-    }
 }

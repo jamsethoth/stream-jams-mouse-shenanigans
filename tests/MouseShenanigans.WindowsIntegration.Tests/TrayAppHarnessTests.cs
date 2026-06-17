@@ -17,7 +17,7 @@ public sealed class TrayAppHarnessTests
 
         Assert.StartsWith(directory.DirectoryPath, options.ConfigurationPath, StringComparison.OrdinalIgnoreCase);
         Assert.StartsWith(directory.DirectoryPath, options.DiagnosticsPath, StringComparison.OrdinalIgnoreCase);
-        Assert.NotEqual(new RuntimeConfigurationPathProvider().GetConfigurationPath(), options.ConfigurationPath);
+        Assert.NotEqual(RuntimeConfigurationFileStore.CreateDefaultConfigurationPath(), options.ConfigurationPath);
         Assert.True(options.LocalControlBaseUri.IsLoopback);
         Assert.Equal("http", options.LocalControlBaseUri.Scheme);
     }

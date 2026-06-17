@@ -1,3 +1,5 @@
+using System.IO.Enumeration;
+
 namespace MouseShenanigans.Windows;
 
 public static class ApplicationSafetyPolicy
@@ -191,30 +193,6 @@ public static class ApplicationSafetyPolicy
 
     private static bool WildcardMatches(string text, string pattern)
     {
-        if (!pattern.Contains('*', StringComparison.Ordinal))
-        {
-            return text.Equals(pattern, StringComparison.OrdinalIgnoreCase);
-        }
-
-        string[] parts = pattern.Split('*', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0)
-        {
-            return true;
-        }
-
-        int index = 0;
-        foreach (string part in parts)
-        {
-            int nextIndex = text.IndexOf(part, index, StringComparison.OrdinalIgnoreCase);
-            if (nextIndex < 0)
-            {
-                return false;
-            }
-
-            index = nextIndex + part.Length;
-        }
-
-        return (pattern.StartsWith('*') || text.StartsWith(parts[0], StringComparison.OrdinalIgnoreCase))
-            && (pattern.EndsWith('*') || text.EndsWith(parts[^1], StringComparison.OrdinalIgnoreCase));
+        return FileSystemName.MatchesSimpleExpression(pattern, text, ignoreCase: true);
     }
 }

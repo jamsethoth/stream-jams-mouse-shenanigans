@@ -8,7 +8,7 @@ public sealed class RuntimeHotkeyBindingTests
     [Fact]
     public void DefaultBindingsIncludeToggleEmergencyDisableTargetCaptureAndAllowedApplicationCapture()
     {
-        IReadOnlyList<HotkeyBinding> bindings = DefaultRuntimeHotkeyBindingProvider.Instance.GetBindings();
+        IReadOnlyList<HotkeyBinding> bindings = DefaultRuntimeHotkeyBindings.All;
 
         Assert.Collection(
             bindings,

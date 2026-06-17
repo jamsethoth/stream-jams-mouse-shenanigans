@@ -53,23 +53,17 @@ public sealed class BoundedDiagnosticRecorderTests
     }
 
     [Fact]
-    public void ExtensionMethodsRecordFutureSafetyConfirmationAndSelfExitEvents()
+    public void ExtensionMethodsRecordProductSafetyAndSelfExitEvents()
     {
         var recorder = new BoundedDiagnosticRecorder();
         var identity = new DiagnosticCapturedIdentity(ProcessName: "TargetApp", WindowTitle: "Target App", RuleName: "rule");
 
         recorder.RecordSafetyBlockedEnable("blocked", identity);
-        recorder.RecordForegroundConfirmationRequested("requested", identity);
-        recorder.RecordForegroundConfirmationAccepted("accepted", identity);
-        recorder.RecordForegroundConfirmationCanceled("canceled", identity);
         recorder.RecordSelfExitRequested("self exit", identity);
 
         Assert.Equal(
             [
                 DiagnosticEventTypes.SafetyBlockedEnable,
-                DiagnosticEventTypes.ForegroundConfirmationRequested,
-                DiagnosticEventTypes.ForegroundConfirmationAccepted,
-                DiagnosticEventTypes.ForegroundConfirmationCanceled,
                 DiagnosticEventTypes.SelfExitRequested,
             ],
             recorder.Snapshot().Select(diagnosticEvent => diagnosticEvent.Type));

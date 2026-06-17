@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define pure core remapping profile behavior: profile value objects, profile collections, delta remapping, JSON profile parsing, and the boundary that lets runtime and tray features consume profiles without putting Windows desktop APIs into core profile logic.
+Define pure core remapping profile behavior: profile value objects, profile collections, delta remapping, and the boundary that lets runtime and tray features consume profiles without putting Windows desktop APIs into core profile logic.
 
 ## Requirements
 
@@ -44,18 +44,6 @@ The system SHALL validate a profile collection before use and SHALL reject dupli
 - **WHEN** a caller requests a profile name that is not present in the collection
 - **THEN** the request fails without selecting an arbitrary fallback profile
 
-### Requirement: No built-in selectable remapping preset
-The system SHALL NOT provide built-in selectable remapping profiles; selectable remapping profiles SHALL come from runtime configuration.
-
-#### Scenario: Built-in catalog is empty
-- **WHEN** the built-in profile catalog is inspected
-- **THEN** it contains no profiles
-
-#### Scenario: Disabled runtime represents no remapping
-- **GIVEN** the user does not want remapping behavior applied
-- **WHEN** the runtime is disabled
-- **THEN** observed movement is not remapped by a pass-through profile
-
 ### Requirement: Delta remapping
 The system SHALL transform raw mouse deltas by decomposing input into directional components and summing each component multiplied by the active profile's configured output vector.
 
@@ -77,25 +65,6 @@ The system SHALL transform raw mouse deltas by decomposing input into directiona
 - **WHEN** a profile maps left movement to `{ "x": -1, "y": 0 }` and down movement to `{ "x": 0, "y": 0.5 }`
 - **AND** the remapping engine receives `dx = -2` and `dy = 6`
 - **THEN** it returns `dx = -2` and `dy = 3`
-
-### Requirement: JSON profile document parsing
-The system SHALL parse UTF-8 JSON profile documents containing named profiles and SHALL validate the parsed profiles before returning them for use.
-
-#### Scenario: Valid JSON profile document is parsed
-- **WHEN** a JSON document contains a `profiles` array with valid profile objects
-- **THEN** the parser returns a validated profile collection
-
-#### Scenario: JSON document is malformed
-- **WHEN** a JSON profile document is not valid JSON
-- **THEN** parsing fails with a diagnostic error
-
-#### Scenario: JSON document has no profiles
-- **WHEN** a JSON profile document does not contain any profiles
-- **THEN** parsing fails with a validation error
-
-#### Scenario: JSON profile has invalid mapping
-- **WHEN** a JSON profile contains an invalid directional mapping
-- **THEN** parsing fails with a validation error instead of returning a partially valid collection
 
 ### Requirement: Runtime integration boundary
 The core remapping profile model SHALL remain independent of Windows desktop APIs while runtime, tray, persistence, and local automation layers consume validated profiles.

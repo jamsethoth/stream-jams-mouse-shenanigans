@@ -1,13 +1,16 @@
-using MouseShenanigans.Windows;
-
 namespace MouseShenanigans.Windows.Tests;
 
-public sealed class ManualRuntimeClock(DateTimeOffset utcNow) : IRuntimeClock
+public sealed class ManualRuntimeClock(DateTimeOffset utcNow) : TimeProvider
 {
-    public DateTimeOffset UtcNow { get; private set; } = utcNow;
+    private DateTimeOffset utcNow = utcNow;
+
+    public override DateTimeOffset GetUtcNow()
+    {
+        return utcNow;
+    }
 
     public void Advance(TimeSpan duration)
     {
-        UtcNow += duration;
+        utcNow += duration;
     }
 }

@@ -105,6 +105,25 @@ public sealed class ApplicationSafetyPolicyTests
         Assert.Contains("Target*", decision.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("TargetGame.exe", "targetgame", true)]
+    [InlineData("Game*Client", "GameOverlayClient", true)]
+    [InlineData("*Client", "GameOverlayClient", true)]
+    [InlineData("Target*", "OtherTarget", false)]
+    public void GameProcessPatternsPreserveCurrentWildcardSemantics(
+        string pattern,
+        string processName,
+        bool expectedGameCandidate)
+    {
+        var safety = new ApplicationSafetyConfiguration(gameProcessPatterns: [pattern]);
+
+        ApplicationSafetyClassification classification =
+            ApplicationSafetyPolicy.Classify(safety, new ApplicationIdentity(processName));
+
+        Assert.Equal(expectedGameCandidate, classification.IsGameCandidate);
+        Assert.Equal(expectedGameCandidate ? pattern : null, classification.MatchedGameCandidateRule);
+    }
+
     [Fact]
     public void GameLibraryRootClassifiesExecutablePath()
     {

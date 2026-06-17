@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using MouseShenanigans.Windows;
 
 namespace MouseShenanigans.Tray;
@@ -5,16 +6,16 @@ namespace MouseShenanigans.Tray;
 public sealed class TrayConfigurationFolderController
 {
     private readonly RuntimeConfigurationController configurationController;
-    private readonly IConfigurationFolderLauncher folderLauncher;
+    private readonly Action<string> openFolder;
     private readonly Action refreshStatus;
 
     public TrayConfigurationFolderController(
         RuntimeConfigurationController configurationController,
-        IConfigurationFolderLauncher folderLauncher,
+        Action<string>? openFolder,
         Action refreshStatus)
     {
         this.configurationController = configurationController ?? throw new ArgumentNullException(nameof(configurationController));
-        this.folderLauncher = folderLauncher ?? throw new ArgumentNullException(nameof(folderLauncher));
+        this.openFolder = openFolder ?? OpenFolder;
         this.refreshStatus = refreshStatus ?? throw new ArgumentNullException(nameof(refreshStatus));
     }
 
@@ -24,7 +25,7 @@ public sealed class TrayConfigurationFolderController
         {
             string folderPath = GetConfigurationFolderPath(configurationController.ConfigurationPath);
             Directory.CreateDirectory(folderPath);
-            folderLauncher.Open(folderPath);
+            openFolder(folderPath);
         }
         catch (Exception exception) when (exception is ArgumentException
             or IOException
@@ -52,5 +53,16 @@ public sealed class TrayConfigurationFolderController
         }
 
         return folderPath;
+    }
+
+    private static void OpenFolder(string folderPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = folderPath,
+            UseShellExecute = true,
+        });
     }
 }

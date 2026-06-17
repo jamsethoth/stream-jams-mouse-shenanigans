@@ -8,7 +8,7 @@ public sealed class RuntimeConfigurationFileStoreTests
     public void MissingConfigReturnsFallbackAndCreatesEditableDefaultConfig()
     {
         string path = CreateTempConfigPath();
-        var store = new RuntimeConfigurationFileStore(new FixedPathProvider(path));
+        var store = new RuntimeConfigurationFileStore(path);
         RuntimeConfiguration fallback = RuntimeProofOfConceptDefaults.CreateConfiguration();
 
         RuntimeConfigurationLoadResult result = store.LoadOrFallback(fallback);
@@ -35,7 +35,7 @@ public sealed class RuntimeConfigurationFileStoreTests
             "MouseShenanigans.Tests",
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);
-        var store = new RuntimeConfigurationFileStore(new FixedPathProvider(path));
+        var store = new RuntimeConfigurationFileStore(path);
         RuntimeConfiguration fallback = RuntimeProofOfConceptDefaults.CreateConfiguration();
 
         RuntimeConfigurationLoadResult result = store.LoadOrFallback(fallback);
@@ -51,7 +51,7 @@ public sealed class RuntimeConfigurationFileStoreTests
         string path = CreateTempConfigPath();
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, "{", System.Text.Encoding.UTF8);
-        var store = new RuntimeConfigurationFileStore(new FixedPathProvider(path));
+        var store = new RuntimeConfigurationFileStore(path);
         RuntimeConfiguration fallback = RuntimeProofOfConceptDefaults.CreateConfiguration();
 
         RuntimeConfigurationLoadResult result = store.LoadOrFallback(fallback);
@@ -65,7 +65,7 @@ public sealed class RuntimeConfigurationFileStoreTests
     public void SaveWritesUtf8JsonAndLoadReadsIt()
     {
         string path = CreateTempConfigPath();
-        var store = new RuntimeConfigurationFileStore(new FixedPathProvider(path));
+        var store = new RuntimeConfigurationFileStore(path);
         RuntimeConfiguration configuration = RuntimeProofOfConceptDefaults.CreateConfiguration();
 
         store.Save(configuration);
@@ -85,13 +85,5 @@ public sealed class RuntimeConfigurationFileStoreTests
             "MouseShenanigans.Tests",
             Guid.NewGuid().ToString("N"),
             "config.json");
-    }
-
-    private sealed class FixedPathProvider(string path) : IRuntimeConfigurationPathProvider
-    {
-        public string GetConfigurationPath()
-        {
-            return path;
-        }
     }
 }

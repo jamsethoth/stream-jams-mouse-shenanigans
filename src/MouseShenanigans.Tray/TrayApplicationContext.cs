@@ -72,7 +72,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             UpdateRuntimeStatus);
         configurationFolderController = new TrayConfigurationFolderController(
             runtimeConfigurationController,
-            new ExplorerConfigurationFolderLauncher(),
+            openFolder: null,
             UpdateRuntimeStatus);
         foregroundAllowlistConfirmationPresenter = new TrayForegroundAllowlistConfirmationPresenter(
             foregroundAllowlistConfirmationController,
@@ -139,7 +139,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         safetySentinelTimer.Start();
         hotkeyController.Register(
             hotkeyReceiver.WindowHandle,
-            DefaultRuntimeHotkeyBindingProvider.Instance.GetBindings());
+            DefaultRuntimeHotkeyBindings.All);
         UpdateRuntimeStatus();
     }
 
@@ -234,7 +234,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             new TargetWindowReader(),
             new WindowsCursorPositionController(),
             new WindowsCursorLockController(),
-            SystemRuntimeClock.Instance,
+            TimeProvider.System,
             WindowsRuntime.IsDesktopInputAvailable);
     }
 
@@ -246,7 +246,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
             ? new InvalidRuntimeConfigurationStore(
                 startupOptions.RuntimeConfigurationPath ?? "<invalid override>",
                 startupOptions.RuntimeConfigurationPathError!)
-            : new RuntimeConfigurationFileStore(new RuntimeConfigurationPathProvider(startupOptions.RuntimeConfigurationPath));
+            : new RuntimeConfigurationFileStore(
+                RuntimeConfigurationFileStore.CreateDefaultConfigurationPath(startupOptions.RuntimeConfigurationPath));
 
         return new RuntimeConfigurationController(
             store,
