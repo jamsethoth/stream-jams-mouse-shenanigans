@@ -95,7 +95,7 @@ The repository now contains the .NET app foundation and the current runtime proo
 - `MouseShenanigans.Tray`, a WinForms tray executable with runtime enable/disable controls, cursor lock control, profile switching, configuration reload, target capture, safety allowlist capture, fixed global hotkeys, local-control hosting, and tray-visible status.
 - `MouseShenanigans.TestWindowFixture`, a Windows-only test fixture app for desktop validation.
 - Unit and integration test projects covering core behavior, Windows adapter behavior, tray behavior, local-control behavior, published-app validation, desktop-gated validation, and non-evasive safety scans.
-- GitHub Actions validation for restore, formatting, analyzers, build, tests, OpenSpec specs, dependency review, and one CodeQL C# analysis path.
+- GitHub Actions validation with one .NET `validate` job for restore, formatting, analyzers, build, and tests, plus OpenSpec specs, dependency review, and one CodeQL C# analysis path.
 
 ## Constraints And Risks
 

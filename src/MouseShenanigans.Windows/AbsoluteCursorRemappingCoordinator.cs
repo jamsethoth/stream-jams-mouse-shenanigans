@@ -22,60 +22,9 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
         RuntimeRemappingOptions options,
         IRawMouseMovementSource movementSource,
         ITargetWindowReader targetWindowReader,
-        ICursorPositionController cursorPositionController)
-        : this(
-            options,
-            movementSource,
-            targetWindowReader,
-            cursorPositionController,
-            new WindowsCursorLockController(),
-            SystemRuntimeClock.Instance,
-            WindowsRuntime.IsDesktopInputAvailable)
-    {
-    }
-
-    public AbsoluteCursorRemappingCoordinator(
-        RuntimeRemappingOptions options,
-        IRawMouseMovementSource movementSource,
-        ITargetWindowReader targetWindowReader,
-        ICursorPositionController cursorPositionController,
-        bool isSupported)
-        : this(
-            options,
-            movementSource,
-            targetWindowReader,
-            cursorPositionController,
-            new WindowsCursorLockController(),
-            SystemRuntimeClock.Instance,
-            isSupported)
-    {
-    }
-
-    public AbsoluteCursorRemappingCoordinator(
-        RuntimeRemappingOptions options,
-        IRawMouseMovementSource movementSource,
-        ITargetWindowReader targetWindowReader,
         ICursorPositionController cursorPositionController,
         ICursorLockController cursorLockController,
-        bool isSupported)
-        : this(
-            options,
-            movementSource,
-            targetWindowReader,
-            cursorPositionController,
-            cursorLockController,
-            SystemRuntimeClock.Instance,
-            isSupported)
-    {
-    }
-
-    public AbsoluteCursorRemappingCoordinator(
-        RuntimeRemappingOptions options,
-        IRawMouseMovementSource movementSource,
-        ITargetWindowReader targetWindowReader,
-        ICursorPositionController cursorPositionController,
-        ICursorLockController cursorLockController,
-        IRuntimeClock clock,
+        TimeProvider clock,
         bool isSupported)
     {
         this.options = options ?? throw new ArgumentNullException(nameof(options));

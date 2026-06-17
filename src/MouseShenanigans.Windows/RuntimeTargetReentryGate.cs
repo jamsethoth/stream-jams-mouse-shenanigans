@@ -3,12 +3,12 @@ namespace MouseShenanigans.Windows;
 public sealed class RuntimeTargetReentryGate
 {
     private readonly TimeSpan gracePeriod;
-    private readonly IRuntimeClock clock;
+    private readonly TimeProvider clock;
     private bool hasObservedState;
     private bool wasInsideBounds;
     private DateTimeOffset? reentryStartedAt;
 
-    public RuntimeTargetReentryGate(TimeSpan gracePeriod, IRuntimeClock clock)
+    public RuntimeTargetReentryGate(TimeSpan gracePeriod, TimeProvider clock)
     {
         if (gracePeriod < TimeSpan.Zero)
         {
@@ -41,7 +41,7 @@ public sealed class RuntimeTargetReentryGate
         if (!wasInsideBounds)
         {
             wasInsideBounds = true;
-            reentryStartedAt = clock.UtcNow;
+            reentryStartedAt = clock.GetUtcNow();
             return new RuntimeTargetReadiness(eligibility, IsEligibleForRemapping: gracePeriod == TimeSpan.Zero);
         }
 
@@ -50,7 +50,7 @@ public sealed class RuntimeTargetReentryGate
             return new RuntimeTargetReadiness(eligibility, IsEligibleForRemapping: true);
         }
 
-        if (clock.UtcNow - startedAt < gracePeriod)
+        if (clock.GetUtcNow() - startedAt < gracePeriod)
         {
             return new RuntimeTargetReadiness(eligibility, IsEligibleForRemapping: false);
         }

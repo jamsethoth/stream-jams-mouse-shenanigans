@@ -111,4 +111,30 @@ public sealed class RuntimeTargetSelectorTests
         Assert.True(selector.Evaluate(matchingSnapshot).IsEligibleForRemapping);
         Assert.Equal(RuntimeTargetEligibilityState.NoMatch, selector.Evaluate(wrongPathSnapshot).State);
     }
+
+    [Fact]
+    public void ProcessAndTitleSelectorMatchesEitherProcessOrTitle()
+    {
+        RuntimeTargetSelector selector = RuntimeTargetSelector.Create(
+            "TargetApp",
+            executablePath: null,
+            windowTitleContains: "Target Canvas");
+        var titleOnlySnapshot = new TargetWindowSnapshot(
+            foregroundWindow: new TargetWindowInfo(
+                processName: "OtherApp",
+                title: "Streaming Target Canvas",
+                bounds: new ScreenRectangle(left: 10, top: 10, right: 110, bottom: 110)),
+            windowUnderCursor: null,
+            cursorPosition: new ScreenPoint(50, 50));
+        var processSnapshot = new TargetWindowSnapshot(
+            foregroundWindow: new TargetWindowInfo(
+                processName: "TargetApp",
+                title: "Other Window",
+                bounds: new ScreenRectangle(left: 10, top: 10, right: 110, bottom: 110)),
+            windowUnderCursor: null,
+            cursorPosition: new ScreenPoint(50, 50));
+
+        Assert.True(selector.Evaluate(titleOnlySnapshot).IsEligibleForRemapping);
+        Assert.True(selector.Evaluate(processSnapshot).IsEligibleForRemapping);
+    }
 }

@@ -6,14 +6,28 @@ public sealed class RuntimeConfigurationFileStore : IRuntimeConfigurationStore
 {
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
-    private readonly IRuntimeConfigurationPathProvider pathProvider;
-
-    public RuntimeConfigurationFileStore(IRuntimeConfigurationPathProvider pathProvider)
+    public RuntimeConfigurationFileStore(string configurationPath)
     {
-        this.pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+        ArgumentException.ThrowIfNullOrWhiteSpace(configurationPath);
+
+        ConfigurationPath = Path.GetFullPath(configurationPath);
     }
 
-    public string ConfigurationPath => pathProvider.GetConfigurationPath();
+    public string ConfigurationPath { get; }
+
+    public static string CreateDefaultConfigurationPath(string? overridePath = null)
+    {
+        if (!string.IsNullOrWhiteSpace(overridePath))
+        {
+            return Path.GetFullPath(overridePath);
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "StreamJams",
+            "MouseShenanigans",
+            "config.json");
+    }
 
     public RuntimeConfigurationLoadResult LoadOrFallback(RuntimeConfiguration fallbackConfiguration)
     {

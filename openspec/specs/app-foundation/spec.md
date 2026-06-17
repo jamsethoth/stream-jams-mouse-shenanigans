@@ -57,15 +57,16 @@ The repository SHALL keep desktop-sensitive validation explicit so normal automa
 - **THEN** it identifies desktop-session behavior that must be verified manually or through desktop-gated tests
 
 ### Requirement: CI validation
-The repository SHALL validate the .NET app foundation in GitHub Actions.
+The repository SHALL validate the .NET app foundation in GitHub Actions without duplicate restore/build work.
 
 #### Scenario: Pull request validation runs .NET checks
 - **WHEN** a pull request targets `main`
 - **THEN** CI restores dependencies, verifies formatting or style, builds the solution, and runs tests
 
-#### Scenario: Required check names stay aligned
+#### Scenario: Required checks stay aligned with validation coverage
 - **WHEN** CI workflows are updated
-- **THEN** repository validation provides checks corresponding to `validate`, `build`, `dependency-review`, and one CodeQL security analysis path
+- **THEN** repository validation provides checks for .NET validation, dependency review, and one CodeQL security analysis path
+- **AND** it avoids duplicate restore/build jobs for the same .NET solution
 - **AND** it avoids adding duplicate required CodeQL checks
 
 ### Requirement: Developer documentation

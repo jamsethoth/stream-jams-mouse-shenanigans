@@ -478,7 +478,7 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
         ITargetWindowReader? targetWindowReader = null,
         ICursorPositionController? cursor = null,
         ICursorLockController? cursorLock = null,
-        IRuntimeClock? clock = null)
+        TimeProvider? clock = null)
     {
         var options = new RuntimeRemappingOptions(
             RuntimeTargetSelector.ForProcessName("TargetApp"),

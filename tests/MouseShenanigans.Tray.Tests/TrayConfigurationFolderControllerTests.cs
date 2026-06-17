@@ -14,17 +14,17 @@ public sealed class TrayConfigurationFolderControllerTests
         var configurationController = new RuntimeConfigurationController(
             new RecordingConfigurationStore(configuration, configPath),
             RuntimeProofOfConceptDefaults.CreateConfiguration());
-        var launcher = new RecordingConfigurationFolderLauncher();
+        List<string> openedFolders = [];
         var refreshRequests = 0;
         var controller = new TrayConfigurationFolderController(
             configurationController,
-            launcher,
+            openedFolders.Add,
             () => refreshRequests++);
 
         controller.OpenConfigurationFolder();
 
         Assert.True(Directory.Exists(expectedFolderPath));
-        Assert.Equal([expectedFolderPath], launcher.OpenedFolders);
+        Assert.Equal([expectedFolderPath], openedFolders);
         Assert.Equal(1, refreshRequests);
         Assert.Null(configurationController.StatusMessage);
     }
@@ -38,11 +38,10 @@ public sealed class TrayConfigurationFolderControllerTests
         var configurationController = new RuntimeConfigurationController(
             new RecordingConfigurationStore(configuration, configPath),
             RuntimeProofOfConceptDefaults.CreateConfiguration());
-        var launcher = new ThrowingConfigurationFolderLauncher(new InvalidOperationException("blocked"));
         var refreshRequests = 0;
         var controller = new TrayConfigurationFolderController(
             configurationController,
-            launcher,
+            _ => throw new InvalidOperationException("blocked"),
             () => refreshRequests++);
 
         controller.OpenConfigurationFolder();
@@ -56,24 +55,6 @@ public sealed class TrayConfigurationFolderControllerTests
     public void GetConfigurationFolderPathRejectsPathWithoutDirectory()
     {
         Assert.Throws<ArgumentException>(() => TrayConfigurationFolderController.GetConfigurationFolderPath("config.json"));
-    }
-
-    private sealed class RecordingConfigurationFolderLauncher : IConfigurationFolderLauncher
-    {
-        public List<string> OpenedFolders { get; } = [];
-
-        public void Open(string folderPath)
-        {
-            OpenedFolders.Add(folderPath);
-        }
-    }
-
-    private sealed class ThrowingConfigurationFolderLauncher(Exception exception) : IConfigurationFolderLauncher
-    {
-        public void Open(string folderPath)
-        {
-            throw exception;
-        }
     }
 
     private sealed class RecordingConfigurationStore(

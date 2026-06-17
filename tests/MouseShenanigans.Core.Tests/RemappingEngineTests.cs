@@ -12,12 +12,6 @@ public sealed class RemappingEngineTests
         down: new MovementVector(0, 1));
 
     [Fact]
-    public void BuiltInProfileCatalogIsEmpty()
-    {
-        Assert.Empty(BuiltInRemappingProfiles.All);
-    }
-
-    [Fact]
     public void HorizontalInversionReversesRightwardMovement()
     {
         RemappedMouseDelta output = RemappingEngine.Remap(
