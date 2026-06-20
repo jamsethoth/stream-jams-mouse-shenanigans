@@ -22,8 +22,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build:
+    name: build
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore MouseShenanigans.slnx
+
+      - name: Build with analyzers
+        run: dotnet build MouseShenanigans.slnx --configuration Release --no-restore
+
+  test:
+    name: test
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore MouseShenanigans.slnx
+
+      - name: Test
+        run: dotnet test MouseShenanigans.slnx --configuration Release --no-restore
+
   validate:
     name: validate
+    needs: build
     runs-on: windows-latest
     timeout-minutes: 20
 
@@ -41,12 +83,6 @@ jobs:
 
       - name: Verify formatting
         run: dotnet format MouseShenanigans.slnx --verify-no-changes --no-restore
-
-      - name: Build with analyzers
-        run: dotnet build MouseShenanigans.slnx --configuration Release --no-restore
-
-      - name: Test
-        run: dotnet test MouseShenanigans.slnx --configuration Release --no-build
 
   openspec:
     name: openspec
