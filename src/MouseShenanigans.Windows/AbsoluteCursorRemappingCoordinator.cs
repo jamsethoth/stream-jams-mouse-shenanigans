@@ -96,8 +96,9 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
             TargetWindowSnapshot targetSnapshot = targetWindowReader.ReadSnapshot();
             RuntimeTargetEligibility eligibility = options.TargetSelector.Evaluate(targetSnapshot);
             RuntimeTargetReadiness readiness = EvaluateReadiness(eligibility);
-            UpdateCursorLock(readiness.Eligibility);
-            SeedAcceptedCursorPosition(readiness.Eligibility.TargetBounds);
+            ScreenRectangle? effectiveTargetBounds = ClipToVirtualScreen(readiness.Eligibility.TargetBounds);
+            UpdateCursorLock(readiness.Eligibility, effectiveTargetBounds);
+            SeedAcceptedCursorPosition(effectiveTargetBounds);
         }
         catch (Exception ex)
         {
@@ -195,15 +196,16 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
             TargetWindowSnapshot targetSnapshot = targetWindowReader.ReadSnapshot();
             RuntimeTargetEligibility eligibility = options.TargetSelector.Evaluate(targetSnapshot);
             RuntimeTargetReadiness readiness = EvaluateReadiness(eligibility);
+            ScreenRectangle? effectiveTargetBounds = ClipToVirtualScreen(readiness.Eligibility.TargetBounds);
 
             ScreenPoint currentPosition = cursorPositionController.GetPosition();
             bool retainedCursorLockAfterNoMatch = ShouldRetainCursorLockAfterNoMatch(readiness.Eligibility);
             if (!retainedCursorLockAfterNoMatch)
             {
-                UpdateCursorLock(readiness.Eligibility);
+                UpdateCursorLock(readiness.Eligibility, effectiveTargetBounds);
             }
 
-            ScreenRectangle? targetBounds = readiness.Eligibility.TargetBounds
+            ScreenRectangle? targetBounds = effectiveTargetBounds
                 ?? (retainedCursorLockAfterNoMatch ? activeCursorLockBounds : null);
             bool isOutsideTargetBounds = targetBounds is { } bounds
                 && !bounds.Contains(currentPosition);
@@ -432,7 +434,25 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
         return Math.Clamp(delta, -absoluteLimit, absoluteLimit);
     }
 
-    private void UpdateCursorLock(RuntimeTargetEligibility eligibility)
+    private static ScreenRectangle? ClipToVirtualScreen(ScreenRectangle? targetBounds)
+    {
+        if (targetBounds is not { } bounds)
+        {
+            return null;
+        }
+
+        System.Drawing.Rectangle virtualScreen = System.Windows.Forms.SystemInformation.VirtualScreen;
+        int left = Math.Max(bounds.Left, virtualScreen.Left);
+        int top = Math.Max(bounds.Top, virtualScreen.Top);
+        int right = Math.Min(bounds.Right, virtualScreen.Right);
+        int bottom = Math.Min(bounds.Bottom, virtualScreen.Bottom);
+
+        return right > left && bottom > top
+            ? new ScreenRectangle(left, top, right, bottom)
+            : null;
+    }
+
+    private void UpdateCursorLock(RuntimeTargetEligibility eligibility, ScreenRectangle? targetBounds)
     {
         if (!isCursorLockEnabled)
         {
@@ -441,7 +461,7 @@ public sealed class AbsoluteCursorRemappingCoordinator : IRuntimeRemappingContro
         }
 
         if (eligibility.State is not (RuntimeTargetEligibilityState.InsideBounds or RuntimeTargetEligibilityState.OutsideBounds)
-            || eligibility.TargetBounds is not { } bounds)
+            || targetBounds is not { } bounds)
         {
             TryReleaseCursorLock();
             return;
