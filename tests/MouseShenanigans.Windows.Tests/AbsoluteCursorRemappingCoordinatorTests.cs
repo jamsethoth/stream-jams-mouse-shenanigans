@@ -6,6 +6,7 @@ namespace MouseShenanigans.Windows.Tests;
 public sealed class AbsoluteCursorRemappingCoordinatorTests
 {
     private static readonly ScreenRectangle TargetBounds = new(left: 0, top: 0, right: 200, bottom: 200);
+    private static readonly ScreenRectangle VirtualScreenBounds = ReadVirtualScreenBounds();
 
     [Fact]
     public void EnableStartsRawInputSourceAndReportsEnabled()
@@ -118,6 +119,98 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
         source.Raise(new IntegerMouseDelta(-5, 0));
 
         Assert.Equal([new ScreenPoint(5, 50)], cursor.SetPositions);
+    }
+
+    [Fact]
+    public void HandleMovementUsesRawDeltaWhenCursorIsPinnedAtVirtualLeftBoundary()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        int y = VirtualScreenBounds.Top + 100;
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(VirtualScreenBounds.Left, y));
+        ScreenRectangle targetBounds = new(
+            VirtualScreenBounds.Left - 8,
+            VirtualScreenBounds.Top,
+            VirtualScreenBounds.Left + 200,
+            VirtualScreenBounds.Top + 200);
+        using var coordinator = CreateCoordinator(
+            source: source,
+            targetWindowReader: new StubTargetWindowReader(TargetSnapshot(new ScreenPoint(VirtualScreenBounds.Left, y), targetBounds)),
+            cursor: cursor);
+        coordinator.Enable();
+
+        source.Raise(new IntegerMouseDelta(-5, 0));
+
+        Assert.Equal([new ScreenPoint(VirtualScreenBounds.Left + 5, y)], cursor.SetPositions);
+    }
+
+    [Fact]
+    public void HandleMovementUsesRawDeltaWhenCursorIsPinnedAtVirtualRightBoundary()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        int rightEdgeX = VirtualScreenBounds.Right - 1;
+        int y = VirtualScreenBounds.Top + 100;
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(rightEdgeX, y));
+        ScreenRectangle targetBounds = new(
+            VirtualScreenBounds.Right - 200,
+            VirtualScreenBounds.Top,
+            VirtualScreenBounds.Right + 8,
+            VirtualScreenBounds.Top + 200);
+        using var coordinator = CreateCoordinator(
+            source: source,
+            targetWindowReader: new StubTargetWindowReader(TargetSnapshot(new ScreenPoint(rightEdgeX, y), targetBounds)),
+            cursor: cursor);
+        coordinator.Enable();
+
+        source.Raise(new IntegerMouseDelta(5, 0));
+
+        Assert.Equal([new ScreenPoint(rightEdgeX - 5, y)], cursor.SetPositions);
+    }
+
+    [Fact]
+    public void HandleMovementUsesRawDeltaWhenCursorIsPinnedAtVirtualTopBoundary()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        int x = VirtualScreenBounds.Left + 100;
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(x, VirtualScreenBounds.Top));
+        ScreenRectangle targetBounds = new(
+            VirtualScreenBounds.Left,
+            VirtualScreenBounds.Top - 8,
+            VirtualScreenBounds.Left + 200,
+            VirtualScreenBounds.Top + 200);
+        using var coordinator = CreateCoordinator(
+            source: source,
+            targetWindowReader: new StubTargetWindowReader(TargetSnapshot(new ScreenPoint(x, VirtualScreenBounds.Top), targetBounds)),
+            cursor: cursor,
+            profile: CreateVerticalInversionProfile());
+        coordinator.Enable();
+
+        source.Raise(new IntegerMouseDelta(0, -5));
+
+        Assert.Equal([new ScreenPoint(x, VirtualScreenBounds.Top + 5)], cursor.SetPositions);
+    }
+
+    [Fact]
+    public void HandleMovementUsesRawDeltaWhenCursorIsPinnedAtVirtualBottomBoundary()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        int bottomEdgeY = VirtualScreenBounds.Bottom - 1;
+        int x = VirtualScreenBounds.Left + 100;
+        var cursor = new RecordingCursorPositionController(new ScreenPoint(x, bottomEdgeY));
+        ScreenRectangle targetBounds = new(
+            VirtualScreenBounds.Left,
+            VirtualScreenBounds.Bottom - 200,
+            VirtualScreenBounds.Left + 200,
+            VirtualScreenBounds.Bottom + 8);
+        using var coordinator = CreateCoordinator(
+            source: source,
+            targetWindowReader: new StubTargetWindowReader(TargetSnapshot(new ScreenPoint(x, bottomEdgeY), targetBounds)),
+            cursor: cursor,
+            profile: CreateVerticalInversionProfile());
+        coordinator.Enable();
+
+        source.Raise(new IntegerMouseDelta(0, 5));
+
+        Assert.Equal([new ScreenPoint(x, bottomEdgeY - 5)], cursor.SetPositions);
     }
 
     [Fact]
@@ -294,6 +387,33 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
 
         Assert.Equal([TargetBounds], cursorLock.LockedBounds);
         Assert.Equal(0, cursorLock.ReleaseRequests);
+    }
+
+    [Fact]
+    public void HandleMovementClipsCursorLockToVirtualScreenBounds()
+    {
+        var source = new RecordingRawMouseMovementSource();
+        var cursorLock = new RecordingCursorLockController();
+        int x = VirtualScreenBounds.Left + 100;
+        ScreenRectangle targetBounds = new(
+            VirtualScreenBounds.Left,
+            VirtualScreenBounds.Top - 8,
+            VirtualScreenBounds.Left + 200,
+            VirtualScreenBounds.Top + 200);
+        using var coordinator = CreateCoordinator(
+            source: source,
+            targetWindowReader: new StubTargetWindowReader(TargetSnapshot(new ScreenPoint(x, VirtualScreenBounds.Top), targetBounds)),
+            cursorLock: cursorLock);
+        coordinator.SetCursorLockEnabled(true);
+        coordinator.Enable();
+
+        source.Raise(new IntegerMouseDelta(5, 0));
+
+        Assert.Equal([new ScreenRectangle(
+            targetBounds.Left,
+            VirtualScreenBounds.Top,
+            targetBounds.Right,
+            targetBounds.Bottom)], cursorLock.LockedBounds);
     }
 
     [Fact]
@@ -478,11 +598,12 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
         ITargetWindowReader? targetWindowReader = null,
         ICursorPositionController? cursor = null,
         ICursorLockController? cursorLock = null,
-        TimeProvider? clock = null)
+        TimeProvider? clock = null,
+        RemappingProfile? profile = null)
     {
         var options = new RuntimeRemappingOptions(
             RuntimeTargetSelector.ForProcessName("TargetApp"),
-            RuntimeProofOfConceptDefaults.HorizontalInversionProfile);
+            profile ?? RuntimeProofOfConceptDefaults.HorizontalInversionProfile);
 
         return new AbsoluteCursorRemappingCoordinator(
             options,
@@ -496,10 +617,31 @@ public sealed class AbsoluteCursorRemappingCoordinatorTests
 
     private static TargetWindowSnapshot TargetSnapshot(ScreenPoint cursorPosition)
     {
+        return TargetSnapshot(cursorPosition, TargetBounds);
+    }
+
+    private static TargetWindowSnapshot TargetSnapshot(ScreenPoint cursorPosition, ScreenRectangle targetBounds)
+    {
         return new TargetWindowSnapshot(
-            foregroundWindow: new TargetWindowInfo("TargetApp", "Target App", TargetBounds),
+            foregroundWindow: new TargetWindowInfo("TargetApp", "Target App", targetBounds),
             windowUnderCursor: null,
             cursorPosition);
+    }
+
+    private static RemappingProfile CreateVerticalInversionProfile()
+    {
+        return new RemappingProfile(
+            "vertical-inversion",
+            left: new MovementVector(-1, 0),
+            right: new MovementVector(1, 0),
+            up: new MovementVector(0, 1),
+            down: new MovementVector(0, -1));
+    }
+
+    private static ScreenRectangle ReadVirtualScreenBounds()
+    {
+        System.Drawing.Rectangle bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
+        return new ScreenRectangle(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
     }
 
     private sealed class RecordingRawMouseMovementSource : IRawMouseMovementSource
